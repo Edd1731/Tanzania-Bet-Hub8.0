@@ -3,20 +3,32 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: BetTZ Tanzania Betting Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: events
+    description: Betting events/matches
+  - name: bets
+    description: Betting operations
+  - name: deposits
+    description: Deposit operations
+  - name: users
+    description: User profile operations
+  - name: admin
+    description: Admin operations
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,7 +36,345 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/signup:
+    post:
+      operationId: signup
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupBody"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with phone and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /me:
+    get:
+      operationId: getMe
+      tags: [users]
+      summary: Get current user profile and balance
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /events:
+    get:
+      operationId: getEvents
+      tags: [events]
+      summary: List all active betting events
+      responses:
+        "200":
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+
+  /bets:
+    post:
+      operationId: placeBet
+      tags: [bets]
+      summary: Place a bet on an event
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaceBetBody"
+      responses:
+        "201":
+          description: Bet placed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bet"
+        "400":
+          description: Insufficient balance or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    get:
+      operationId: getMyBets
+      tags: [bets]
+      summary: Get current user bets
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of bets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bet"
+
+  /deposits:
+    post:
+      operationId: createDeposit
+      tags: [deposits]
+      summary: Submit a deposit request (M-Pesa or other)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepositBody"
+      responses:
+        "201":
+          description: Deposit submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+    get:
+      operationId: getMyDeposits
+      tags: [deposits]
+      summary: Get current user deposit history
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of deposits
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+
+  /stats/summary:
+    get:
+      operationId: getStatsSummary
+      tags: [users]
+      summary: Get user betting stats (total bets, wins, balance)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Stats summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsSummary"
+
+  /admin/transactions:
+    get:
+      operationId: adminGetTransactions
+      tags: [admin]
+      summary: Admin - Get all deposit transactions
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: All transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TransactionWithUser"
+
+  /admin/transactions/{id}/approve:
+    post:
+      operationId: adminApproveTransaction
+      tags: [admin]
+      summary: Admin - Approve a deposit transaction
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Transaction approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /admin/transactions/{id}/reject:
+    post:
+      operationId: adminRejectTransaction
+      tags: [admin]
+      summary: Admin - Reject a deposit transaction
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Transaction rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /admin/bets:
+    get:
+      operationId: adminGetBets
+      tags: [admin]
+      summary: Admin - Get all bets
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: All bets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BetWithUser"
+
+  /admin/bets/{id}/settle:
+    post:
+      operationId: adminSettleBet
+      tags: [admin]
+      summary: Admin - Settle a bet (win/lose)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettleBetBody"
+      responses:
+        "200":
+          description: Bet settled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bet"
+
+  /admin/events:
+    post:
+      operationId: adminCreateEvent
+      tags: [admin]
+      summary: Admin - Create a new betting event
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEventBody"
+      responses:
+        "201":
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+
+  /admin/users:
+    get:
+      operationId: adminGetUsers
+      tags: [admin]
+      summary: Admin - Get all users
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: All users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /admin/stats:
+    get:
+      operationId: adminGetStats
+      tags: [admin]
+      summary: Admin - Get platform-wide stats
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Platform stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +384,298 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    SignupBody:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        password:
+          type: string
+      required:
+        - name
+        - phone
+        - password
+
+    LoginBody:
+      type: object
+      properties:
+        phone:
+          type: string
+        password:
+          type: string
+      required:
+        - phone
+        - password
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - token
+        - user
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+        balance:
+          type: number
+        isAdmin:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - phone
+        - balance
+        - isAdmin
+
+    Event:
+      type: object
+      properties:
+        id:
+          type: integer
+        matchId:
+          type: string
+        teamHome:
+          type: string
+        teamAway:
+          type: string
+        league:
+          type: string
+        oddsHome:
+          type: number
+        oddsDraw:
+          type: number
+        oddsAway:
+          type: number
+        status:
+          type: string
+          enum: [active, closed, settled]
+        startsAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - matchId
+        - teamHome
+        - teamAway
+        - league
+        - oddsHome
+        - oddsDraw
+        - oddsAway
+        - status
+
+    CreateEventBody:
+      type: object
+      properties:
+        teamHome:
+          type: string
+        teamAway:
+          type: string
+        league:
+          type: string
+        oddsHome:
+          type: number
+        oddsDraw:
+          type: number
+        oddsAway:
+          type: number
+        startsAt:
+          type: string
+          format: date-time
+      required:
+        - teamHome
+        - teamAway
+        - league
+        - oddsHome
+        - oddsDraw
+        - oddsAway
+
+    PlaceBetBody:
+      type: object
+      properties:
+        eventId:
+          type: integer
+        choice:
+          type: string
+          enum: [home, draw, away]
+        amount:
+          type: number
+      required:
+        - eventId
+        - choice
+        - amount
+
+    Bet:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        eventId:
+          type: integer
+        choice:
+          type: string
+          enum: [home, draw, away]
+        amount:
+          type: number
+        potentialWin:
+          type: number
+        status:
+          type: string
+          enum: [pending, won, lost]
+        event:
+          $ref: "#/components/schemas/Event"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - eventId
+        - choice
+        - amount
+        - potentialWin
+        - status
+
+    BetWithUser:
+      allOf:
+        - $ref: "#/components/schemas/Bet"
+        - type: object
+          properties:
+            user:
+              $ref: "#/components/schemas/User"
+
+    DepositBody:
+      type: object
+      properties:
+        amount:
+          type: number
+        txId:
+          type: string
+        method:
+          type: string
+          enum: [mpesa, tigopesa, halopesa, airtel]
+      required:
+        - amount
+        - txId
+        - method
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        amount:
+          type: number
+        txId:
+          type: string
+        method:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - amount
+        - txId
+        - method
+        - status
+
+    TransactionWithUser:
+      allOf:
+        - $ref: "#/components/schemas/Transaction"
+        - type: object
+          properties:
+            user:
+              $ref: "#/components/schemas/User"
+
+    SettleBetBody:
+      type: object
+      properties:
+        outcome:
+          type: string
+          enum: [won, lost]
+      required:
+        - outcome
+
+    StatsSummary:
+      type: object
+      properties:
+        totalBets:
+          type: integer
+        wonBets:
+          type: integer
+        lostBets:
+          type: integer
+        pendingBets:
+          type: integer
+        totalWagered:
+          type: number
+        totalWon:
+          type: number
+        balance:
+          type: number
+      required:
+        - totalBets
+        - wonBets
+        - lostBets
+        - pendingBets
+        - totalWagered
+        - totalWon
+        - balance
+
+    AdminStats:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+        totalBets:
+          type: integer
+        pendingDeposits:
+          type: integer
+        totalDeposited:
+          type: number
+        totalPaidOut:
+          type: number
+        activeBets:
+          type: integer
+      required:
+        - totalUsers
+        - totalBets
+        - pendingDeposits
+        - totalDeposited
+        - totalPaidOut
+        - activeBets

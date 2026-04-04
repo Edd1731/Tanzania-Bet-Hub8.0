@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "BetTZ - Tanzania Betting"
+version = "1.0.0"
+id = "artifacts/bettingapp"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23030
+
+[services.development]
+run = "pnpm --filter @workspace/bettingapp run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/bettingapp", "run", "build" ]
+publicDir = "artifacts/bettingapp/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23030"
+BASE_PATH = "/"
