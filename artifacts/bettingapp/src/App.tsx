@@ -25,36 +25,35 @@ const queryClient = new QueryClient({
 function ProtectedRoute({ component: Component, adminOnly }: { component: () => JSX.Element; adminOnly?: boolean }) {
   const { user, isLoading, token } = useAuth();
   if (!token) return <Redirect to="/login" />;
-  if (isLoading) return <div className="flex items-center justify-center min-h-[60vh] text-muted-foreground text-sm">Loading...</div>;
+  if (isLoading) return <div className="flex items-center justify-center min-h-[60vh] text-white/40 text-sm">Loading...</div>;
   if (adminOnly && !user?.isAdmin) return <Redirect to="/" />;
   return <Component />;
 }
 
 function AppRoutes() {
-  const { user } = useAuth();
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen" style={{ background: "#0a1628" }}>
       <Navbar />
-      {/* bottom padding on mobile for logged-in users (bottom nav = 56px) */}
-      <div className={user ? "sm:pb-0 pb-14" : ""}>
-      <Switch>
-        <Route path="/" component={HomePage} />
-        <Route path="/login" component={LoginPage} />
-        <Route path="/register" component={RegisterPage} />
-        <Route path="/my-bets">
-          <ProtectedRoute component={MyBetsPage} />
-        </Route>
-        <Route path="/deposit">
-          <ProtectedRoute component={DepositPage} />
-        </Route>
-        <Route path="/profile">
-          <ProtectedRoute component={ProfilePage} />
-        </Route>
-        <Route path="/admin">
-          <ProtectedRoute component={AdminPage} adminOnly />
-        </Route>
-        <Route component={NotFound} />
-      </Switch>
+      {/* Bottom padding = 56px fixed bottom nav + 8px gap */}
+      <div className="pb-16">
+        <Switch>
+          <Route path="/" component={HomePage} />
+          <Route path="/login" component={LoginPage} />
+          <Route path="/register" component={RegisterPage} />
+          <Route path="/my-bets">
+            <ProtectedRoute component={MyBetsPage} />
+          </Route>
+          <Route path="/deposit">
+            <ProtectedRoute component={DepositPage} />
+          </Route>
+          <Route path="/profile">
+            <ProtectedRoute component={ProfilePage} />
+          </Route>
+          <Route path="/admin">
+            <ProtectedRoute component={AdminPage} adminOnly />
+          </Route>
+          <Route component={NotFound} />
+        </Switch>
       </div>
     </div>
   );
