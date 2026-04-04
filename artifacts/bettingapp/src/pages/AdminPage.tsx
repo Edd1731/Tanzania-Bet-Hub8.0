@@ -135,15 +135,42 @@ export default function AdminPage() {
 
       {/* Stats */}
       {activeTab === "stats" && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <StatBox label={t("total_users")} value={stats?.totalUsers ?? 0} />
-          <StatBox label={t("total_bets")} value={stats?.totalBets ?? 0} />
-          <StatBox label={t("active_bets")} value={stats?.activeBets ?? 0} />
-          <StatBox label="Pending Deposits" value={stats?.pendingDeposits ?? 0} />
-          <StatBox label="Pending Withdrawals" value={(stats as any)?.pendingWithdrawals ?? 0} />
-          <StatBox label={t("total_deposited")} value={`TZS ${Number(stats?.totalDeposited ?? 0).toLocaleString()}`} />
-          <StatBox label="Total Withdrawn" value={`TZS ${Number((stats as any)?.totalWithdrawn ?? 0).toLocaleString()}`} />
-          <StatBox label={t("total_paid_out")} value={`TZS ${Number(stats?.totalPaidOut ?? 0).toLocaleString()}`} />
+        <div className="space-y-3">
+          {/* M-Pesa API status banner */}
+          <div className="rounded-xl px-4 py-3 flex items-center justify-between"
+            style={{
+              background: (stats as any)?.mpesaApiActive ? "rgba(27,138,60,0.12)" : "rgba(253,208,23,0.08)",
+              border: `1px solid ${(stats as any)?.mpesaApiActive ? "rgba(74,222,128,0.3)" : "rgba(253,208,23,0.2)"}`,
+            }}
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-2.5 h-2.5 rounded-full animate-pulse shrink-0"
+                style={{ background: (stats as any)?.mpesaApiActive ? "#4ade80" : "#FDD017" }} />
+              <div>
+                <div className="text-sm font-black"
+                  style={{ color: (stats as any)?.mpesaApiActive ? "#4ade80" : "#FDD017" }}>
+                  {(stats as any)?.mpesaApiActive ? "Live API Verification Active" : "Pattern-Match Verification (Fallback)"}
+                </div>
+                <div className="text-[10px] text-white/40 mt-0.5">
+                  {(stats as any)?.mpesaApiActive
+                    ? "Deposits are verified in real-time against Vodacom M-Pesa Tanzania API"
+                    : "Set MPESA_TZ_API_KEY, MPESA_TZ_PUBLIC_KEY & MPESA_TZ_SHORTCODE in Secrets to enable live verification"}
+                </div>
+              </div>
+            </div>
+            <span className="text-lg">{(stats as any)?.mpesaApiActive ? "🔗" : "⚠️"}</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <StatBox label={t("total_users")} value={stats?.totalUsers ?? 0} />
+            <StatBox label={t("total_bets")} value={stats?.totalBets ?? 0} />
+            <StatBox label={t("active_bets")} value={stats?.activeBets ?? 0} />
+            <StatBox label="Pending Deposits" value={stats?.pendingDeposits ?? 0} />
+            <StatBox label="Pending Withdrawals" value={(stats as any)?.pendingWithdrawals ?? 0} />
+            <StatBox label={t("total_deposited")} value={`TZS ${Number(stats?.totalDeposited ?? 0).toLocaleString()}`} />
+            <StatBox label="Total Withdrawn" value={`TZS ${Number((stats as any)?.totalWithdrawn ?? 0).toLocaleString()}`} />
+            <StatBox label={t("total_paid_out")} value={`TZS ${Number(stats?.totalPaidOut ?? 0).toLocaleString()}`} />
+          </div>
         </div>
       )}
 

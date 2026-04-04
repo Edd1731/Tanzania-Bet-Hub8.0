@@ -226,6 +226,8 @@ router.post("/admin/withdrawals/:id/reject", requireAuth, requireAdmin, async (r
   res.json({ id: w.id, userId: w.userId, amount: parseFloat(w.amount), phone: w.phone, method: w.method, status: "rejected", note: w.note ?? null, createdAt: w.createdAt });
 });
 
+import { isMpesaConfigured } from "../services/mpesa-tz";
+
 router.get("/admin/stats", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const allUsers = await db.select().from(usersTable);
   const allBets = await db.select().from(betsTable);
@@ -241,7 +243,7 @@ router.get("/admin/stats", requireAuth, requireAdmin, async (req, res): Promise<
   const totalPaidOut = allBets.filter(b => b.status === "won").reduce((acc, b) => acc + parseFloat(b.potentialWin), 0);
   const activeBets = allBets.filter(b => b.status === "pending").length;
 
-  res.json({ totalUsers, totalBets, pendingDeposits, pendingWithdrawals, totalDeposited, totalWithdrawn, totalPaidOut, activeBets });
+  res.json({ totalUsers, totalBets, pendingDeposits, pendingWithdrawals, totalDeposited, totalWithdrawn, totalPaidOut, activeBets, mpesaApiActive: isMpesaConfigured() });
 });
 
 export default router;
