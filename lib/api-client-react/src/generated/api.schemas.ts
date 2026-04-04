@@ -257,6 +257,28 @@ export type WithdrawalWithUser = Withdrawal & {
   user?: User;
 };
 
+export interface AdminCreateUserBody {
+  name: string;
+  phone: string;
+  password: string;
+  initialBalance?: number;
+  isAdmin?: boolean;
+}
+
+export type AdminEditBalanceBodyMode =
+  (typeof AdminEditBalanceBodyMode)[keyof typeof AdminEditBalanceBodyMode];
+
+export const AdminEditBalanceBodyMode = {
+  set: "set",
+  add: "add",
+  subtract: "subtract",
+} as const;
+
+export interface AdminEditBalanceBody {
+  mode: AdminEditBalanceBodyMode;
+  amount: number;
+}
+
 export interface AdminStats {
   totalUsers: number;
   totalBets: number;

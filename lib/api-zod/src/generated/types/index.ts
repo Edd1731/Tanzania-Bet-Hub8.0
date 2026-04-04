@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./adminCreateUserBody";
+export * from "./adminEditBalanceBody";
+export * from "./adminEditBalanceBodyMode";
 export * from "./adminStats";
 export * from "./authResponse";
 export * from "./bet";

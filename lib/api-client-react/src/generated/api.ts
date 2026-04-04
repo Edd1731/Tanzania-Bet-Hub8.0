@@ -17,6 +17,8 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AdminCreateUserBody,
+  AdminEditBalanceBody,
   AdminStats,
   AuthResponse,
   Bet,
@@ -1777,6 +1779,179 @@ export function useAdminGetUsers<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Admin - Create a new user
+ */
+export const getAdminCreateUserUrl = () => {
+  return `/api/admin/users`;
+};
+
+export const adminCreateUser = async (
+  adminCreateUserBody: AdminCreateUserBody,
+  options?: RequestInit,
+): Promise<User> => {
+  return customFetch<User>(getAdminCreateUserUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(adminCreateUserBody),
+  });
+};
+
+export const getAdminCreateUserMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminCreateUser>>,
+    TError,
+    { data: BodyType<AdminCreateUserBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminCreateUser>>,
+  TError,
+  { data: BodyType<AdminCreateUserBody> },
+  TContext
+> => {
+  const mutationKey = ["adminCreateUser"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminCreateUser>>,
+    { data: BodyType<AdminCreateUserBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return adminCreateUser(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdminCreateUserMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminCreateUser>>
+>;
+export type AdminCreateUserMutationBody = BodyType<AdminCreateUserBody>;
+export type AdminCreateUserMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Admin - Create a new user
+ */
+export const useAdminCreateUser = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminCreateUser>>,
+    TError,
+    { data: BodyType<AdminCreateUserBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof adminCreateUser>>,
+  TError,
+  { data: BodyType<AdminCreateUserBody> },
+  TContext
+> => {
+  return useMutation(getAdminCreateUserMutationOptions(options));
+};
+
+/**
+ * @summary Admin - Set or adjust a user balance
+ */
+export const getAdminEditBalanceUrl = (id: number) => {
+  return `/api/admin/users/${id}/balance`;
+};
+
+export const adminEditBalance = async (
+  id: number,
+  adminEditBalanceBody: AdminEditBalanceBody,
+  options?: RequestInit,
+): Promise<User> => {
+  return customFetch<User>(getAdminEditBalanceUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(adminEditBalanceBody),
+  });
+};
+
+export const getAdminEditBalanceMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminEditBalance>>,
+    TError,
+    { id: number; data: BodyType<AdminEditBalanceBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminEditBalance>>,
+  TError,
+  { id: number; data: BodyType<AdminEditBalanceBody> },
+  TContext
+> => {
+  const mutationKey = ["adminEditBalance"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminEditBalance>>,
+    { id: number; data: BodyType<AdminEditBalanceBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return adminEditBalance(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdminEditBalanceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminEditBalance>>
+>;
+export type AdminEditBalanceMutationBody = BodyType<AdminEditBalanceBody>;
+export type AdminEditBalanceMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Admin - Set or adjust a user balance
+ */
+export const useAdminEditBalance = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminEditBalance>>,
+    TError,
+    { id: number; data: BodyType<AdminEditBalanceBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof adminEditBalance>>,
+  TError,
+  { id: number; data: BodyType<AdminEditBalanceBody> },
+  TContext
+> => {
+  return useMutation(getAdminEditBalanceMutationOptions(options));
+};
 
 /**
  * @summary Admin - Get platform-wide stats

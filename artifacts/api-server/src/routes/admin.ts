@@ -1,11 +1,12 @@
 import { Router, type IRouter } from "express";
 import { db, usersTable, betsTable, eventsTable, transactionsTable, withdrawalsTable } from "@workspace/db";
-import { eq, count, sum } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { AdminSettleBetBody, AdminCreateEventBody } from "@workspace/api-zod";
 import { isMpesaConfigured } from "../services/mpesa-tz";
 import { isFootballApiConfigured, probeApiEndpoints } from "../services/football-api";
 import { syncLiveFixtures, syncUpcomingFixtures } from "../services/fixture-sync";
+import bcrypt from "bcryptjs";
 
 const router: IRouter = Router();
 
@@ -184,6 +185,62 @@ router.post("/admin/events", requireAuth, requireAdmin, async (req, res): Promis
 router.get("/admin/users", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const users = await db.select().from(usersTable).orderBy(usersTable.createdAt);
   res.json(users.map(serializeUser));
+});
+
+// ─── POST /admin/users — create a new user ────────────────────────────────────
+router.post("/admin/users", requireAuth, requireAdmin, async (req, res): Promise<void> => {
+  const { name, phone, password, initialBalance, isAdmin } = req.body ?? {};
+  if (!name || !phone || !password) {
+    res.status(400).json({ message: "name, phone and password are required" });
+    return;
+  }
+
+  const existing = await db.select().from(usersTable).where(eq(usersTable.phone, String(phone)));
+  if (existing.length > 0) {
+    res.status(400).json({ message: "Phone number already registered" });
+    return;
+  }
+
+  const hash = await bcrypt.hash(String(password), 10);
+  const [user] = await db.insert(usersTable).values({
+    name: String(name),
+    phone: String(phone),
+    passwordHash: hash,
+    balance: String(parseFloat(initialBalance) || 0),
+    isAdmin: Boolean(isAdmin) ?? false,
+  }).returning();
+
+  res.status(201).json(serializeUser(user));
+});
+
+// ─── PUT /admin/users/:id/balance — set / add / subtract balance ──────────────
+router.put("/admin/users/:id/balance", requireAuth, requireAdmin, async (req, res): Promise<void> => {
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
+  const { mode, amount } = req.body ?? {};
+
+  if (!["set", "add", "subtract"].includes(mode) || typeof amount !== "number" || amount < 0) {
+    res.status(400).json({ message: "mode must be set/add/subtract and amount must be a non-negative number" });
+    return;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+  if (!user) {
+    res.status(404).json({ message: "User not found" });
+    return;
+  }
+
+  const current = parseFloat(user.balance);
+  let newBalance: number;
+  if (mode === "set")      newBalance = amount;
+  else if (mode === "add") newBalance = current + amount;
+  else                     newBalance = Math.max(0, current - amount);
+
+  const [updated] = await db.update(usersTable)
+    .set({ balance: String(newBalance) })
+    .where(eq(usersTable.id, id))
+    .returning();
+
+  res.json(serializeUser(updated));
 });
 
 router.get("/admin/withdrawals", requireAuth, requireAdmin, async (req, res): Promise<void> => {

@@ -456,6 +456,64 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/User"
+    post:
+      operationId: adminCreateUser
+      tags: [admin]
+      summary: Admin - Create a new user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminCreateUserBody"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/users/{id}/balance:
+    put:
+      operationId: adminEditBalance
+      tags: [admin]
+      summary: Admin - Set or adjust a user balance
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminEditBalanceBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /admin/stats:
     get:
@@ -849,6 +907,36 @@ components:
           properties:
             user:
               $ref: "#/components/schemas/User"
+
+    AdminCreateUserBody:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        password:
+          type: string
+        initialBalance:
+          type: number
+        isAdmin:
+          type: boolean
+      required:
+        - name
+        - phone
+        - password
+
+    AdminEditBalanceBody:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [set, add, subtract]
+        amount:
+          type: number
+      required:
+        - mode
+        - amount
 
     AdminStats:
       type: object

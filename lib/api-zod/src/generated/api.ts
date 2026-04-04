@@ -558,6 +558,38 @@ export const AdminGetUsersResponseItem = zod.object({
 export const AdminGetUsersResponse = zod.array(AdminGetUsersResponseItem);
 
 /**
+ * @summary Admin - Create a new user
+ */
+export const AdminCreateUserBody = zod.object({
+  name: zod.string(),
+  phone: zod.string(),
+  password: zod.string(),
+  initialBalance: zod.number().optional(),
+  isAdmin: zod.boolean().optional(),
+});
+
+/**
+ * @summary Admin - Set or adjust a user balance
+ */
+export const AdminEditBalanceParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AdminEditBalanceBody = zod.object({
+  mode: zod.enum(["set", "add", "subtract"]),
+  amount: zod.number(),
+});
+
+export const AdminEditBalanceResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  phone: zod.string(),
+  balance: zod.number(),
+  isAdmin: zod.boolean(),
+  createdAt: zod.coerce.date().optional(),
+});
+
+/**
  * @summary Admin - Get platform-wide stats
  */
 export const AdminGetStatsResponse = zod.object({
