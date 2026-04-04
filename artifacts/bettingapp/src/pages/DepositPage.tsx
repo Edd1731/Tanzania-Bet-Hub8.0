@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 const GOLD = "#FDD017";
 const NAVY = "#0d1f3c";
-const LIPA_NUMBER = "148738859";
+const LIPA_NUMBER = "148470928";
 
 // ─── Parse Tanzania mobile money SMS ─────────────────────────────
 // Handles M-Pesa, TigoPesa, HaloPesa, Airtel Tanzania confirmation SMS formats
@@ -251,8 +251,8 @@ export default function DepositPage() {
               rows={3}
               placeholder={
                 isSw
-                  ? "Mfano: Confirmed. TSH 5,000 sent to 148738859...\nTransaction ID: MP12345678"
-                  : "Example: Confirmed. TSH 5,000 sent to 148738859...\nTransaction ID: MP12345678"
+                  ? "Mfano: Confirmed. TSH 5,000 sent to 148470928...\nTransaction ID: MP12345678"
+                  : "Example: Confirmed. TSH 5,000 sent to 148470928...\nTransaction ID: MP12345678"
               }
               className="w-full px-3 py-3 rounded-xl text-sm text-white placeholder-white/20 outline-none resize-none leading-relaxed"
               style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
