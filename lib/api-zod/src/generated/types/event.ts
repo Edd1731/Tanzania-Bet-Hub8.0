@@ -13,6 +13,10 @@ export interface Event {
   teamHome: string;
   teamAway: string;
   league: string;
+  country?: string;
+  logoHome?: string;
+  logoAway?: string;
+  leagueLogo?: string;
   oddsHome: number;
   oddsDraw: number;
   oddsAway: number;
@@ -24,6 +28,11 @@ export interface Event {
   oddsU35?: number;
   oddsBttsY?: number;
   oddsBttsN?: number;
+  scoreHome?: number | null;
+  scoreAway?: number | null;
+  elapsed?: number | null;
+  /** NS=not started, 1H=first half, HT=half time, 2H=second half, FT=full time, AET=after extra time, PEN=penalties, CANC=cancelled, PST=postponed */
+  statusShort?: string;
   status: EventStatus;
   startsAt?: Date;
   createdAt?: Date;

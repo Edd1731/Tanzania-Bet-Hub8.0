@@ -568,6 +568,14 @@ components:
           type: string
         league:
           type: string
+        country:
+          type: string
+        logoHome:
+          type: string
+        logoAway:
+          type: string
+        leagueLogo:
+          type: string
         oddsHome:
           type: number
         oddsDraw:
@@ -590,9 +598,21 @@ components:
           type: number
         oddsBttsN:
           type: number
+        scoreHome:
+          type: integer
+          nullable: true
+        scoreAway:
+          type: integer
+          nullable: true
+        elapsed:
+          type: integer
+          nullable: true
+        statusShort:
+          type: string
+          description: "NS=not started, 1H=first half, HT=half time, 2H=second half, FT=full time, AET=after extra time, PEN=penalties, CANC=cancelled, PST=postponed"
         status:
           type: string
-          enum: [active, closed, settled]
+          enum: [active, finished, cancelled]
         startsAt:
           type: string
           format: date-time

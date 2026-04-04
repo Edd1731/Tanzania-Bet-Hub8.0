@@ -85,7 +85,9 @@ export default function HomePage() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const qc = useQueryClient();
-  const { data: events, isLoading } = useGetEvents();
+  const { data: events, isLoading } = useGetEvents({
+    query: { refetchInterval: 30_000 }, // auto-refresh every 30 s for live scores
+  });
   const placeBet = usePlaceBet();
 
   const [activeTab, setActiveTab]       = useState("sports");
@@ -149,18 +151,36 @@ export default function HomePage() {
     setPlacingBet(false);
   };
 
-  // Filter events by odds filter
+  const LIVE_STATUS = new Set(["1H", "2H", "HT", "ET", "P", "BT", "INT", "LIVE"]);
+  const isLiveMatch  = (ev: Event) => LIVE_STATUS.has(ev.statusShort ?? "NS");
+  const isFinished   = (ev: Event) => ["FT", "AET", "PEN", "AWD", "WO"].includes(ev.statusShort ?? "");
+
+  // Filter events by odds filter + active tab
   const filteredEvents = (events ?? []).filter(ev => {
-    if (activeOddFilter === null) return true;
-    return ev.oddsHome <= activeOddFilter || ev.oddsDraw <= activeOddFilter || ev.oddsAway <= activeOddFilter;
+    if (activeTab === "live"    && !isLiveMatch(ev))  return false;
+    if (activeTab === "sports"  && isFinished(ev))     return false;
+    if (activeOddFilter !== null) {
+      return ev.oddsHome <= activeOddFilter || ev.oddsDraw <= activeOddFilter || ev.oddsAway <= activeOddFilter;
+    }
+    return true;
+  });
+
+  // Sort: live first, then by kick-off time
+  const sortedEvents = [...filteredEvents].sort((a, b) => {
+    const aLive = isLiveMatch(a) ? 0 : 1;
+    const bLive = isLiveMatch(b) ? 0 : 1;
+    if (aLive !== bLive) return aLive - bLive;
+    return new Date(a.startsAt ?? 0).getTime() - new Date(b.startsAt ?? 0).getTime();
   });
 
   // Group by league
   const grouped: Record<string, Event[]> = {};
-  filteredEvents.forEach(ev => {
+  sortedEvents.forEach(ev => {
     if (!grouped[ev.league]) grouped[ev.league] = [];
     grouped[ev.league]!.push(ev);
   });
+
+  const liveCount = (events ?? []).filter(isLiveMatch).length;
 
   return (
     <div style={{ background: NAVY2, minHeight: "100vh" }} className="pb-20">
@@ -181,7 +201,8 @@ export default function HomePage() {
               {tab.label}
               {tab.badge === "LIVE" && (
                 <span className="flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded-full bg-red-600 text-white">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />LIVE
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  {liveCount > 0 ? liveCount : "LIVE"}
                 </span>
               )}
               {tab.badge === "NEW" && (
@@ -303,10 +324,24 @@ export default function HomePage() {
                     className="flex items-center gap-2 px-3 py-2 rounded-t-xl"
                     style={{ background: "#0c1a30", borderLeft: `3px solid ${GREEN}` }}
                   >
-                    <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ background: GREEN }}>
-                      <span className="text-[8px] text-white font-black">⚽</span>
+                    {leagueEvents[0]?.leagueLogo ? (
+                      <img
+                        src={leagueEvents[0].leagueLogo}
+                        alt={league}
+                        className="w-4 h-4 object-contain shrink-0"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ background: GREEN }}>
+                        <span className="text-[8px] text-white font-black">⚽</span>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-[11px] font-black text-white/70 uppercase tracking-widest">{league}</span>
+                      {leagueEvents[0]?.country && (
+                        <span className="text-[9px] text-white/30 ml-1.5">{leagueEvents[0].country}</span>
+                      )}
                     </div>
-                    <span className="text-[11px] font-black text-white/60 uppercase tracking-widest">{league}</span>
                     <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full text-white/40" style={{ background: "rgba(255,255,255,0.05)" }}>
                       {leagueEvents.length} match{leagueEvents.length > 1 ? "es" : ""}
                     </span>
@@ -333,23 +368,69 @@ export default function HomePage() {
                         >
                           {/* Match info row */}
                           <div className="px-3 pt-2.5 pb-1 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="flex items-center gap-1 text-[9px] font-bold text-green-400">
-                                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                                LIVE
-                              </span>
-                              <span className="text-[9px] text-white/30">#{event.matchId}</span>
+                            <div className="flex items-center gap-1.5">
+                              {/* Status badge */}
+                              {isLiveMatch(event) ? (
+                                <span className="flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded-full text-white" style={{ background: "#DC2626" }}>
+                                  <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
+                                  {event.statusShort === "HT" ? "HT" : event.statusShort === "ET" ? "ET" : "LIVE"}
+                                  {event.elapsed != null && event.statusShort !== "HT" && (
+                                    <span className="ml-0.5">{event.elapsed}&apos;</span>
+                                  )}
+                                </span>
+                              ) : isFinished(event) ? (
+                                <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full text-white/70" style={{ background: "rgba(255,255,255,0.1)" }}>
+                                  {event.statusShort === "AET" ? "AET" : event.statusShort === "PEN" ? "PEN" : "FT"}
+                                </span>
+                              ) : (
+                                <span className="text-[9px] font-bold text-white/30 uppercase tracking-wide">
+                                  {event.startsAt
+                                    ? new Date(event.startsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                                    : "Today"}
+                                </span>
+                              )}
                             </div>
-                            <span className="text-[9px] text-white/30">{event.startsAt ? new Date(event.startsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Today"}</span>
+                            <span className="text-[9px] text-white/20 truncate max-w-[120px]">{event.league}</span>
                           </div>
 
                           {/* Teams + odds */}
                           <div className="px-3 pb-2">
-                            {/* Team names */}
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-black text-white truncate flex-1">{event.teamHome}</span>
-                              <span className="text-[10px] font-black text-white/30 mx-2 shrink-0">VS</span>
-                              <span className="text-sm font-black text-white truncate flex-1 text-right">{event.teamAway}</span>
+                            {/* Team names + logos + live score */}
+                            <div className="flex items-center justify-between mb-2 gap-2">
+                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                {event.logoHome && (
+                                  <img
+                                    src={event.logoHome}
+                                    alt={event.teamHome}
+                                    className="w-5 h-5 object-contain shrink-0"
+                                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                  />
+                                )}
+                                <span className="text-sm font-black text-white truncate">{event.teamHome}</span>
+                              </div>
+
+                              {/* Live score OR vs */}
+                              {(isLiveMatch(event) || isFinished(event)) && event.scoreHome != null && event.scoreAway != null ? (
+                                <div className="flex items-center gap-1 shrink-0 px-2 py-0.5 rounded-lg" style={{ background: isLiveMatch(event) ? "rgba(220,38,38,0.15)" : "rgba(255,255,255,0.06)" }}>
+                                  <span className="text-sm font-black" style={{ color: isLiveMatch(event) ? "#ef4444" : "white" }}>{event.scoreHome}</span>
+                                  <span className="text-[10px] text-white/30 font-black">-</span>
+                                  <span className="text-sm font-black" style={{ color: isLiveMatch(event) ? "#ef4444" : "white" }}>{event.scoreAway}</span>
+                                </div>
+                              ) : (
+                                <span className="text-[10px] font-black text-white/30 mx-1 shrink-0">VS</span>
+                              )}
+
+                              <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
+                                <span className="text-sm font-black text-white truncate">{event.teamAway}</span>
+                                {event.logoAway && (
+                                  <img
+                                    src={event.logoAway}
+                                    alt={event.teamAway}
+                                    className="w-5 h-5 object-contain shrink-0"
+                                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                  />
+                                )}
+                              </div>
                             </div>
 
                             {/* 1X2 odds buttons */}

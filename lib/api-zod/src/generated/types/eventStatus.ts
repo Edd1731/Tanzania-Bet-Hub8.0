@@ -10,6 +10,6 @@ export type EventStatus = (typeof EventStatus)[keyof typeof EventStatus];
 
 export const EventStatus = {
   active: "active",
-  closed: "closed",
-  settled: "settled",
+  finished: "finished",
+  cancelled: "cancelled",
 } as const;

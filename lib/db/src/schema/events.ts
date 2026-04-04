@@ -1,4 +1,4 @@
-import { pgTable, serial, text, numeric, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, numeric, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -8,6 +8,10 @@ export const eventsTable = pgTable("events", {
   teamHome: text("team_home").notNull(),
   teamAway: text("team_away").notNull(),
   league: text("league").notNull(),
+  country: text("country"),
+  logoHome: text("logo_home"),
+  logoAway: text("logo_away"),
+  leagueLogo: text("league_logo"),
   // 1X2 main market
   oddsHome: numeric("odds_home", { precision: 6, scale: 2 }).notNull(),
   oddsDraw: numeric("odds_draw", { precision: 6, scale: 2 }).notNull(),
@@ -22,7 +26,13 @@ export const eventsTable = pgTable("events", {
   // Both Teams to Score
   oddsBttsY: numeric("odds_btts_y", { precision: 6, scale: 2 }).default("1.75"),
   oddsBttsN: numeric("odds_btts_n", { precision: 6, scale: 2 }).default("1.95"),
-  // Status / time
+  // Live score
+  scoreHome: integer("score_home"),
+  scoreAway: integer("score_away"),
+  elapsed: integer("elapsed"),
+  // Status: NS=not started, 1H, HT, 2H, FT, AET, PEN, CANC, PST, SUSP, TBD
+  statusShort: text("status_short").default("NS"),
+  // Overall row status (active = bettable, finished, cancelled)
   status: text("status").notNull().default("active"),
   startsAt: timestamp("starts_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

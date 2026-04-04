@@ -3,6 +3,9 @@ import { db, usersTable, betsTable, eventsTable, transactionsTable, withdrawalsT
 import { eq, count, sum } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { AdminSettleBetBody, AdminCreateEventBody } from "@workspace/api-zod";
+import { isMpesaConfigured } from "../services/mpesa-tz";
+import { isFootballApiConfigured } from "../services/football-api";
+import { syncLiveFixtures, syncUpcomingFixtures } from "../services/fixture-sync";
 
 const router: IRouter = Router();
 
@@ -226,7 +229,19 @@ router.post("/admin/withdrawals/:id/reject", requireAuth, requireAdmin, async (r
   res.json({ id: w.id, userId: w.userId, amount: parseFloat(w.amount), phone: w.phone, method: w.method, status: "rejected", note: w.note ?? null, createdAt: w.createdAt });
 });
 
-import { isMpesaConfigured } from "../services/mpesa-tz";
+// ─── POST /admin/sync-fixtures ────────────────────────────────────────────────
+router.post("/admin/sync-fixtures", requireAuth, requireAdmin, async (req, res): Promise<void> => {
+  if (!isFootballApiConfigured()) {
+    res.status(503).json({ message: "RAPIDAPI_KEY not configured. Add it in Secrets to enable live fixture sync." });
+    return;
+  }
+  const type = (req.query.type as string) ?? "all";
+  let liveResult   = { synced: 0, errors: 0 };
+  let upcomingResult = { synced: 0, errors: 0 };
+  if (type === "live" || type === "all") liveResult     = await syncLiveFixtures();
+  if (type === "upcoming" || type === "all") upcomingResult = await syncUpcomingFixtures();
+  res.json({ live: liveResult, upcoming: upcomingResult, apiConfigured: true });
+});
 
 router.get("/admin/stats", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const allUsers = await db.select().from(usersTable);
@@ -243,7 +258,7 @@ router.get("/admin/stats", requireAuth, requireAdmin, async (req, res): Promise<
   const totalPaidOut = allBets.filter(b => b.status === "won").reduce((acc, b) => acc + parseFloat(b.potentialWin), 0);
   const activeBets = allBets.filter(b => b.status === "pending").length;
 
-  res.json({ totalUsers, totalBets, pendingDeposits, pendingWithdrawals, totalDeposited, totalWithdrawn, totalPaidOut, activeBets, mpesaApiActive: isMpesaConfigured() });
+  res.json({ totalUsers, totalBets, pendingDeposits, pendingWithdrawals, totalDeposited, totalWithdrawn, totalPaidOut, activeBets, mpesaApiActive: isMpesaConfigured(), footballApiActive: isFootballApiConfigured() });
 });
 
 export default router;

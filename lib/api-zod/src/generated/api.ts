@@ -64,6 +64,10 @@ export const GetEventsResponseItem = zod.object({
   teamHome: zod.string(),
   teamAway: zod.string(),
   league: zod.string(),
+  country: zod.string().optional(),
+  logoHome: zod.string().optional(),
+  logoAway: zod.string().optional(),
+  leagueLogo: zod.string().optional(),
   oddsHome: zod.number(),
   oddsDraw: zod.number(),
   oddsAway: zod.number(),
@@ -75,7 +79,16 @@ export const GetEventsResponseItem = zod.object({
   oddsU35: zod.number().optional(),
   oddsBttsY: zod.number().optional(),
   oddsBttsN: zod.number().optional(),
-  status: zod.enum(["active", "closed", "settled"]),
+  scoreHome: zod.number().nullish(),
+  scoreAway: zod.number().nullish(),
+  elapsed: zod.number().nullish(),
+  statusShort: zod
+    .string()
+    .optional()
+    .describe(
+      "NS=not started, 1H=first half, HT=half time, 2H=second half, FT=full time, AET=after extra time, PEN=penalties, CANC=cancelled, PST=postponed",
+    ),
+  status: zod.enum(["active", "finished", "cancelled"]),
   startsAt: zod.coerce.date().optional(),
   createdAt: zod.coerce.date().optional(),
 });
@@ -138,6 +151,10 @@ export const GetMyBetsResponseItem = zod.object({
       teamHome: zod.string(),
       teamAway: zod.string(),
       league: zod.string(),
+      country: zod.string().optional(),
+      logoHome: zod.string().optional(),
+      logoAway: zod.string().optional(),
+      leagueLogo: zod.string().optional(),
       oddsHome: zod.number(),
       oddsDraw: zod.number(),
       oddsAway: zod.number(),
@@ -149,7 +166,16 @@ export const GetMyBetsResponseItem = zod.object({
       oddsU35: zod.number().optional(),
       oddsBttsY: zod.number().optional(),
       oddsBttsN: zod.number().optional(),
-      status: zod.enum(["active", "closed", "settled"]),
+      scoreHome: zod.number().nullish(),
+      scoreAway: zod.number().nullish(),
+      elapsed: zod.number().nullish(),
+      statusShort: zod
+        .string()
+        .optional()
+        .describe(
+          "NS=not started, 1H=first half, HT=half time, 2H=second half, FT=full time, AET=after extra time, PEN=penalties, CANC=cancelled, PST=postponed",
+        ),
+      status: zod.enum(["active", "finished", "cancelled"]),
       startsAt: zod.coerce.date().optional(),
       createdAt: zod.coerce.date().optional(),
     })
@@ -385,6 +411,10 @@ export const AdminGetBetsResponseItem = zod
         teamHome: zod.string(),
         teamAway: zod.string(),
         league: zod.string(),
+        country: zod.string().optional(),
+        logoHome: zod.string().optional(),
+        logoAway: zod.string().optional(),
+        leagueLogo: zod.string().optional(),
         oddsHome: zod.number(),
         oddsDraw: zod.number(),
         oddsAway: zod.number(),
@@ -396,7 +426,16 @@ export const AdminGetBetsResponseItem = zod
         oddsU35: zod.number().optional(),
         oddsBttsY: zod.number().optional(),
         oddsBttsN: zod.number().optional(),
-        status: zod.enum(["active", "closed", "settled"]),
+        scoreHome: zod.number().nullish(),
+        scoreAway: zod.number().nullish(),
+        elapsed: zod.number().nullish(),
+        statusShort: zod
+          .string()
+          .optional()
+          .describe(
+            "NS=not started, 1H=first half, HT=half time, 2H=second half, FT=full time, AET=after extra time, PEN=penalties, CANC=cancelled, PST=postponed",
+          ),
+        status: zod.enum(["active", "finished", "cancelled"]),
         startsAt: zod.coerce.date().optional(),
         createdAt: zod.coerce.date().optional(),
       })
@@ -460,6 +499,10 @@ export const AdminSettleBetResponse = zod.object({
       teamHome: zod.string(),
       teamAway: zod.string(),
       league: zod.string(),
+      country: zod.string().optional(),
+      logoHome: zod.string().optional(),
+      logoAway: zod.string().optional(),
+      leagueLogo: zod.string().optional(),
       oddsHome: zod.number(),
       oddsDraw: zod.number(),
       oddsAway: zod.number(),
@@ -471,7 +514,16 @@ export const AdminSettleBetResponse = zod.object({
       oddsU35: zod.number().optional(),
       oddsBttsY: zod.number().optional(),
       oddsBttsN: zod.number().optional(),
-      status: zod.enum(["active", "closed", "settled"]),
+      scoreHome: zod.number().nullish(),
+      scoreAway: zod.number().nullish(),
+      elapsed: zod.number().nullish(),
+      statusShort: zod
+        .string()
+        .optional()
+        .describe(
+          "NS=not started, 1H=first half, HT=half time, 2H=second half, FT=full time, AET=after extra time, PEN=penalties, CANC=cancelled, PST=postponed",
+        ),
+      status: zod.enum(["active", "finished", "cancelled"]),
       startsAt: zod.coerce.date().optional(),
       createdAt: zod.coerce.date().optional(),
     })
