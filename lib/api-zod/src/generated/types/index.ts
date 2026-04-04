@@ -30,3 +30,8 @@ export * from "./transaction";
 export * from "./transactionStatus";
 export * from "./transactionWithUser";
 export * from "./user";
+export * from "./withdrawal";
+export * from "./withdrawalBody";
+export * from "./withdrawalBodyMethod";
+export * from "./withdrawalStatus";
+export * from "./withdrawalWithUser";

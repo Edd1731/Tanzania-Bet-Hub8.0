@@ -659,8 +659,25 @@ export default function ProfilePage() {
       </Section>
 
       {/* ── Fund Account ── */}
-      <Section icon={<IcoDeposit />} title="Fund Account" subtitle="M-Pesa, TigoPesa, HaloPesa, Airtel" accent="#00A651">
-        <div className="px-4 py-4 space-y-3">
+      <Section icon={<IcoDeposit />} title="Fund Account" subtitle="Deposit & Withdraw — M-Pesa, TigoPesa, HaloPesa, Airtel" accent="#00A651">
+        {/* Quick action row */}
+        <div className="px-4 pt-4 pb-2 grid grid-cols-2 gap-2">
+          <Link href="/deposit"
+            className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black text-black"
+            style={{ background: GOLD }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2.5" strokeLinecap="round"><path d="M12 19V5M5 12l7 7 7-7" /></svg>
+            Deposit
+          </Link>
+          <Link href="/withdraw"
+            className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black"
+            style={{ background: "rgba(27,138,60,0.15)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.25)" }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12l7-7 7 7" /></svg>
+            Withdraw
+          </Link>
+        </div>
+        <div className="px-4 pb-4 space-y-2">
           {[
             { key: "mpesa",    label: "M-Pesa",       number: "0744 123 456", color: "#00A651", logo: "📱" },
             { key: "tigopesa", label: "Tigo Pesa",    number: "0712 123 456", color: "#009BDE", logo: "📲" },
@@ -668,20 +685,14 @@ export default function ProfilePage() {
             { key: "airtel",   label: "Airtel Money", number: "0684 123 456", color: "#ED1C24", logo: "📡" },
           ].map(m => (
             <div key={m.key}
-              className="flex items-center gap-3 px-3 py-3 rounded-xl"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}
             >
-              <span className="text-xl shrink-0">{m.logo}</span>
+              <span className="text-lg shrink-0">{m.logo}</span>
               <div className="flex-1">
-                <div className="text-sm font-black" style={{ color: m.color }}>{m.label}</div>
-                <div className="text-[10px] text-white/30 mt-0.5">Send to: {m.number}</div>
+                <div className="text-xs font-black" style={{ color: m.color }}>{m.label}</div>
+                <div className="text-[10px] text-white/25 mt-0.5">Payin: {m.number}</div>
               </div>
-              <Link href="/deposit"
-                className="text-[10px] font-black px-3 py-1.5 rounded-lg text-black"
-                style={{ background: GOLD }}
-              >
-                Deposit
-              </Link>
             </div>
           ))}
         </div>

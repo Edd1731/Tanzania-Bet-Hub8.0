@@ -12,6 +12,7 @@ import MyBetsPage from "@/pages/MyBetsPage";
 import DepositPage from "@/pages/DepositPage";
 import ProfilePage from "@/pages/ProfilePage";
 import AdminPage from "@/pages/AdminPage";
+import WithdrawPage from "@/pages/WithdrawPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,6 +49,9 @@ function AppRoutes() {
           </Route>
           <Route path="/profile">
             <ProtectedRoute component={ProfilePage} />
+          </Route>
+          <Route path="/withdraw">
+            <ProtectedRoute component={WithdrawPage} />
           </Route>
           <Route path="/admin">
             <ProtectedRoute component={AdminPage} adminOnly />

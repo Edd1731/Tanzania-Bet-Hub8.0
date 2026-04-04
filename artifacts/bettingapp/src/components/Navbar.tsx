@@ -20,7 +20,7 @@ const NAV_ITEMS = [
 
 const ACCOUNT_ITEMS = [
   { id: "deposit",     label: "Deposit",             href: "/deposit",  icon: <IcoDeposit /> },
-  { id: "withdraw",    label: "Withdraw",            href: "/deposit",  icon: <IcoWithdraw /> },
+  { id: "withdraw",    label: "Withdraw",            href: "/withdraw", icon: <IcoWithdraw /> },
   { id: "bet-history", label: "Bet History",         href: "/my-bets",  icon: <IcoBetHistory /> },
   { id: "tx-history",  label: "Transaction History", href: "/deposit",  icon: <IcoTxHistory /> },
   { id: "settings",    label: "Settings",            href: "/profile",  icon: <IcoSettings /> },

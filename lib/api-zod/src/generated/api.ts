@@ -195,6 +195,98 @@ export const GetStatsSummaryResponse = zod.object({
 });
 
 /**
+ * @summary Submit a withdrawal request
+ */
+export const CreateWithdrawalBody = zod.object({
+  amount: zod.number(),
+  phone: zod.string(),
+  method: zod.enum(["mpesa", "tigopesa", "halopesa", "airtel"]),
+});
+
+/**
+ * @summary Get current user withdrawal history
+ */
+export const GetMyWithdrawalsResponseItem = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  amount: zod.number(),
+  phone: zod.string(),
+  method: zod.string(),
+  status: zod.enum(["pending", "approved", "rejected"]),
+  note: zod.string().nullish(),
+  createdAt: zod.coerce.date().optional(),
+});
+export const GetMyWithdrawalsResponse = zod.array(GetMyWithdrawalsResponseItem);
+
+/**
+ * @summary Admin - Get all withdrawal requests
+ */
+export const AdminGetWithdrawalsResponseItem = zod
+  .object({
+    id: zod.number(),
+    userId: zod.number(),
+    amount: zod.number(),
+    phone: zod.string(),
+    method: zod.string(),
+    status: zod.enum(["pending", "approved", "rejected"]),
+    note: zod.string().nullish(),
+    createdAt: zod.coerce.date().optional(),
+  })
+  .and(
+    zod.object({
+      user: zod
+        .object({
+          id: zod.number(),
+          name: zod.string(),
+          phone: zod.string(),
+          balance: zod.number(),
+          isAdmin: zod.boolean(),
+          createdAt: zod.coerce.date().optional(),
+        })
+        .optional(),
+    }),
+  );
+export const AdminGetWithdrawalsResponse = zod.array(
+  AdminGetWithdrawalsResponseItem,
+);
+
+/**
+ * @summary Admin - Approve a withdrawal request
+ */
+export const AdminApproveWithdrawalParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AdminApproveWithdrawalResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  amount: zod.number(),
+  phone: zod.string(),
+  method: zod.string(),
+  status: zod.enum(["pending", "approved", "rejected"]),
+  note: zod.string().nullish(),
+  createdAt: zod.coerce.date().optional(),
+});
+
+/**
+ * @summary Admin - Reject a withdrawal request and restore balance
+ */
+export const AdminRejectWithdrawalParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AdminRejectWithdrawalResponse = zod.object({
+  id: zod.number(),
+  userId: zod.number(),
+  amount: zod.number(),
+  phone: zod.string(),
+  method: zod.string(),
+  status: zod.enum(["pending", "approved", "rejected"]),
+  note: zod.string().nullish(),
+  createdAt: zod.coerce.date().optional(),
+});
+
+/**
  * @summary Admin - Get all deposit transactions
  */
 export const AdminGetTransactionsResponseItem = zod
@@ -420,7 +512,9 @@ export const AdminGetStatsResponse = zod.object({
   totalUsers: zod.number(),
   totalBets: zod.number(),
   pendingDeposits: zod.number(),
+  pendingWithdrawals: zod.number(),
   totalDeposited: zod.number(),
+  totalWithdrawn: zod.number(),
   totalPaidOut: zod.number(),
   activeBets: zod.number(),
 });

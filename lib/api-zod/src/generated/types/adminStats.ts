@@ -10,7 +10,9 @@ export interface AdminStats {
   totalUsers: number;
   totalBets: number;
   pendingDeposits: number;
+  pendingWithdrawals: number;
   totalDeposited: number;
+  totalWithdrawn: number;
   totalPaidOut: number;
   activeBets: number;
 }

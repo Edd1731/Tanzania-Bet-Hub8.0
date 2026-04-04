@@ -2,12 +2,14 @@ import { useState } from "react";
 import {
   useAdminGetStats, useAdminGetTransactions, useAdminApproveTransaction, useAdminRejectTransaction,
   useAdminGetBets, useAdminSettleBet, useAdminCreateEvent, useAdminGetUsers,
+  useAdminGetWithdrawals, useAdminApproveWithdrawal, useAdminRejectWithdrawal,
   getAdminGetTransactionsQueryKey, getAdminGetBetsQueryKey, getAdminGetStatsQueryKey, getAdminGetUsersQueryKey,
+  getAdminGetWithdrawalsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "@/hooks/use-translation";
 
-type Tab = "stats" | "deposits" | "bets" | "events" | "users";
+type Tab = "stats" | "deposits" | "withdrawals" | "bets" | "events" | "users";
 
 function StatBox({ label, value }: { label: string; value: string | number }) {
   return (
@@ -25,11 +27,14 @@ export default function AdminPage() {
 
   const { data: stats } = useAdminGetStats({ query: { queryKey: getAdminGetStatsQueryKey() } });
   const { data: transactions, isLoading: txLoading } = useAdminGetTransactions({ query: { queryKey: getAdminGetTransactionsQueryKey(), enabled: activeTab === "deposits" } });
+  const { data: withdrawals, isLoading: wdLoading } = useAdminGetWithdrawals({ query: { queryKey: getAdminGetWithdrawalsQueryKey(), enabled: activeTab === "withdrawals" } });
   const { data: bets, isLoading: betsLoading } = useAdminGetBets({ query: { queryKey: getAdminGetBetsQueryKey(), enabled: activeTab === "bets" } });
   const { data: users, isLoading: usersLoading } = useAdminGetUsers({ query: { queryKey: getAdminGetUsersQueryKey(), enabled: activeTab === "users" } });
 
   const approveTx = useAdminApproveTransaction();
   const rejectTx = useAdminRejectTransaction();
+  const approveWd = useAdminApproveWithdrawal();
+  const rejectWd = useAdminRejectWithdrawal();
   const settleBet = useAdminSettleBet();
   const createEvent = useAdminCreateEvent();
 
@@ -49,6 +54,18 @@ export default function AdminPage() {
   const handleReject = async (id: number) => {
     await rejectTx.mutateAsync({ id });
     qc.invalidateQueries({ queryKey: getAdminGetTransactionsQueryKey() });
+    qc.invalidateQueries({ queryKey: getAdminGetStatsQueryKey() });
+  };
+
+  const handleApproveWd = async (id: number) => {
+    await approveWd.mutateAsync({ id });
+    qc.invalidateQueries({ queryKey: getAdminGetWithdrawalsQueryKey() });
+    qc.invalidateQueries({ queryKey: getAdminGetStatsQueryKey() });
+  };
+
+  const handleRejectWd = async (id: number) => {
+    await rejectWd.mutateAsync({ id });
+    qc.invalidateQueries({ queryKey: getAdminGetWithdrawalsQueryKey() });
     qc.invalidateQueries({ queryKey: getAdminGetStatsQueryKey() });
   };
 
@@ -80,6 +97,7 @@ export default function AdminPage() {
   const tabs: { key: Tab; label: string }[] = [
     { key: "stats", label: t("stats") },
     { key: "deposits", label: t("deposits") + (stats?.pendingDeposits ? ` (${stats.pendingDeposits})` : "") },
+    { key: "withdrawals", label: "Withdrawals" + ((stats as any)?.pendingWithdrawals ? ` (${(stats as any).pendingWithdrawals})` : "") },
     { key: "bets", label: t("bets") },
     { key: "events", label: t("create_event") },
     { key: "users", label: t("users") },
@@ -122,7 +140,9 @@ export default function AdminPage() {
           <StatBox label={t("total_bets")} value={stats?.totalBets ?? 0} />
           <StatBox label={t("active_bets")} value={stats?.activeBets ?? 0} />
           <StatBox label="Pending Deposits" value={stats?.pendingDeposits ?? 0} />
+          <StatBox label="Pending Withdrawals" value={(stats as any)?.pendingWithdrawals ?? 0} />
           <StatBox label={t("total_deposited")} value={`TZS ${Number(stats?.totalDeposited ?? 0).toLocaleString()}`} />
+          <StatBox label="Total Withdrawn" value={`TZS ${Number((stats as any)?.totalWithdrawn ?? 0).toLocaleString()}`} />
           <StatBox label={t("total_paid_out")} value={`TZS ${Number(stats?.totalPaidOut ?? 0).toLocaleString()}`} />
         </div>
       )}
@@ -160,6 +180,53 @@ export default function AdminPage() {
                       className="text-xs px-3 py-1.5 bg-red-500/15 text-red-400 rounded-lg hover:bg-red-500/25 font-bold"
                     >
                       {t("reject")}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Withdrawals */}
+      {activeTab === "withdrawals" && (
+        <div className="space-y-3">
+          {wdLoading ? (
+            <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-16 bg-card rounded-xl animate-pulse border border-border" />)}</div>
+          ) : withdrawals?.length === 0 ? (
+            <p className="text-center py-12 text-muted-foreground">No withdrawal requests</p>
+          ) : [...(withdrawals ?? [])].reverse().map(w => (
+            <div key={w.id} className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-foreground text-sm">
+                  {(w as any).user?.name} <span className="text-muted-foreground font-normal text-xs">({(w as any).user?.phone})</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {w.method.toUpperCase()} → {w.phone}
+                </div>
+                <div className="text-[10px] text-muted-foreground/60">
+                  {new Date(w.createdAt!).toLocaleString()}
+                </div>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="text-right">
+                  <div className="font-black text-foreground">TZS {Number(w.amount).toLocaleString()}</div>
+                  <div className={`text-xs font-bold ${statusColor(w.status)}`}>{w.status}</div>
+                </div>
+                {w.status === "pending" && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleApproveWd(w.id)}
+                      className="text-xs px-3 py-1.5 bg-green-500/15 text-green-400 rounded-lg hover:bg-green-500/25 font-bold"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => handleRejectWd(w.id)}
+                      className="text-xs px-3 py-1.5 bg-red-500/15 text-red-400 rounded-lg hover:bg-red-500/25 font-bold"
+                    >
+                      Reject
                     </button>
                   </div>
                 )}

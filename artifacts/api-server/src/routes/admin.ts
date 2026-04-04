@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, betsTable, eventsTable, transactionsTable } from "@workspace/db";
+import { db, usersTable, betsTable, eventsTable, transactionsTable, withdrawalsTable } from "@workspace/db";
 import { eq, count, sum } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { AdminSettleBetBody, AdminCreateEventBody } from "@workspace/api-zod";
@@ -183,19 +183,65 @@ router.get("/admin/users", requireAuth, requireAdmin, async (req, res): Promise<
   res.json(users.map(serializeUser));
 });
 
+router.get("/admin/withdrawals", requireAuth, requireAdmin, async (req, res): Promise<void> => {
+  const rows = await db.select().from(withdrawalsTable).orderBy(withdrawalsTable.createdAt);
+  const withUsers = await Promise.all(rows.map(async (w) => {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, w.userId));
+    return {
+      id: w.id, userId: w.userId,
+      amount: parseFloat(w.amount),
+      phone: w.phone, method: w.method, status: w.status, note: w.note ?? null,
+      createdAt: w.createdAt,
+      ...(user ? { user: serializeUser(user) } : {}),
+    };
+  }));
+  res.json(withUsers);
+});
+
+router.post("/admin/withdrawals/:id/approve", requireAuth, requireAdmin, async (req, res): Promise<void> => {
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
+  const [w] = await db.update(withdrawalsTable)
+    .set({ status: "approved" })
+    .where(eq(withdrawalsTable.id, id))
+    .returning();
+  if (!w) { res.status(404).json({ message: "Withdrawal not found" }); return; }
+  res.json({ id: w.id, userId: w.userId, amount: parseFloat(w.amount), phone: w.phone, method: w.method, status: w.status, note: w.note ?? null, createdAt: w.createdAt });
+});
+
+router.post("/admin/withdrawals/:id/reject", requireAuth, requireAdmin, async (req, res): Promise<void> => {
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
+  const [w] = await db.select().from(withdrawalsTable).where(eq(withdrawalsTable.id, id));
+  if (!w) { res.status(404).json({ message: "Withdrawal not found" }); return; }
+
+  await db.update(withdrawalsTable).set({ status: "rejected" }).where(eq(withdrawalsTable.id, id));
+
+  if (w.status === "pending") {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, w.userId));
+    if (user) {
+      const restored = parseFloat(user.balance) + parseFloat(w.amount);
+      await db.update(usersTable).set({ balance: String(restored) }).where(eq(usersTable.id, user.id));
+    }
+  }
+
+  res.json({ id: w.id, userId: w.userId, amount: parseFloat(w.amount), phone: w.phone, method: w.method, status: "rejected", note: w.note ?? null, createdAt: w.createdAt });
+});
+
 router.get("/admin/stats", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const allUsers = await db.select().from(usersTable);
   const allBets = await db.select().from(betsTable);
   const allTxs = await db.select().from(transactionsTable);
+  const allWithdrawals = await db.select().from(withdrawalsTable);
 
   const totalUsers = allUsers.length;
   const totalBets = allBets.length;
   const pendingDeposits = allTxs.filter(t => t.status === "pending").length;
+  const pendingWithdrawals = allWithdrawals.filter(w => w.status === "pending").length;
   const totalDeposited = allTxs.filter(t => t.status === "approved").reduce((acc, t) => acc + parseFloat(t.amount), 0);
+  const totalWithdrawn = allWithdrawals.filter(w => w.status === "approved").reduce((acc, w) => acc + parseFloat(w.amount), 0);
   const totalPaidOut = allBets.filter(b => b.status === "won").reduce((acc, b) => acc + parseFloat(b.potentialWin), 0);
   const activeBets = allBets.filter(b => b.status === "pending").length;
 
-  res.json({ totalUsers, totalBets, pendingDeposits, totalDeposited, totalPaidOut, activeBets });
+  res.json({ totalUsers, totalBets, pendingDeposits, pendingWithdrawals, totalDeposited, totalWithdrawn, totalPaidOut, activeBets });
 });
 
 export default router;

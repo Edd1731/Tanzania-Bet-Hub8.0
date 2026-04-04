@@ -208,11 +208,53 @@ export interface StatsSummary {
   balance: number;
 }
 
+export type WithdrawalBodyMethod =
+  (typeof WithdrawalBodyMethod)[keyof typeof WithdrawalBodyMethod];
+
+export const WithdrawalBodyMethod = {
+  mpesa: "mpesa",
+  tigopesa: "tigopesa",
+  halopesa: "halopesa",
+  airtel: "airtel",
+} as const;
+
+export interface WithdrawalBody {
+  amount: number;
+  phone: string;
+  method: WithdrawalBodyMethod;
+}
+
+export type WithdrawalStatus =
+  (typeof WithdrawalStatus)[keyof typeof WithdrawalStatus];
+
+export const WithdrawalStatus = {
+  pending: "pending",
+  approved: "approved",
+  rejected: "rejected",
+} as const;
+
+export interface Withdrawal {
+  id: number;
+  userId: number;
+  amount: number;
+  phone: string;
+  method: string;
+  status: WithdrawalStatus;
+  note?: string | null;
+  createdAt?: string;
+}
+
+export type WithdrawalWithUser = Withdrawal & {
+  user?: User;
+};
+
 export interface AdminStats {
   totalUsers: number;
   totalBets: number;
   pendingDeposits: number;
+  pendingWithdrawals: number;
   totalDeposited: number;
+  totalWithdrawn: number;
   totalPaidOut: number;
   activeBets: number;
 }

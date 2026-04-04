@@ -18,6 +18,8 @@ tags:
     description: Betting operations
   - name: deposits
     description: Deposit operations
+  - name: withdrawals
+    description: Withdrawal operations
   - name: users
     description: User profile operations
   - name: admin
@@ -211,6 +213,108 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StatsSummary"
+
+  /withdrawals:
+    post:
+      operationId: createWithdrawal
+      tags: [withdrawals]
+      summary: Submit a withdrawal request
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawalBody"
+      responses:
+        "201":
+          description: Withdrawal submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Withdrawal"
+        "400":
+          description: Insufficient balance or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    get:
+      operationId: getMyWithdrawals
+      tags: [withdrawals]
+      summary: Get current user withdrawal history
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of withdrawals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Withdrawal"
+
+  /admin/withdrawals:
+    get:
+      operationId: adminGetWithdrawals
+      tags: [admin]
+      summary: Admin - Get all withdrawal requests
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: All withdrawals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WithdrawalWithUser"
+
+  /admin/withdrawals/{id}/approve:
+    post:
+      operationId: adminApproveWithdrawal
+      tags: [admin]
+      summary: Admin - Approve a withdrawal request
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Withdrawal approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Withdrawal"
+
+  /admin/withdrawals/{id}/reject:
+    post:
+      operationId: adminRejectWithdrawal
+      tags: [admin]
+      summary: Admin - Reject a withdrawal request and restore balance
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Withdrawal rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Withdrawal"
 
   /admin/transactions:
     get:
@@ -673,6 +777,59 @@ components:
         - totalWon
         - balance
 
+    WithdrawalBody:
+      type: object
+      properties:
+        amount:
+          type: number
+        phone:
+          type: string
+        method:
+          type: string
+          enum: [mpesa, tigopesa, halopesa, airtel]
+      required:
+        - amount
+        - phone
+        - method
+
+    Withdrawal:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        amount:
+          type: number
+        phone:
+          type: string
+        method:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        note:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - amount
+        - phone
+        - method
+        - status
+
+    WithdrawalWithUser:
+      allOf:
+        - $ref: "#/components/schemas/Withdrawal"
+        - type: object
+          properties:
+            user:
+              $ref: "#/components/schemas/User"
+
     AdminStats:
       type: object
       properties:
@@ -682,7 +839,11 @@ components:
           type: integer
         pendingDeposits:
           type: integer
+        pendingWithdrawals:
+          type: integer
         totalDeposited:
+          type: number
+        totalWithdrawn:
           type: number
         totalPaidOut:
           type: number
@@ -692,6 +853,8 @@ components:
         - totalUsers
         - totalBets
         - pendingDeposits
+        - pendingWithdrawals
         - totalDeposited
+        - totalWithdrawn
         - totalPaidOut
         - activeBets
