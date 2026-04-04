@@ -9,13 +9,13 @@ const NAVY2 = "#0a1628";
 
 // ─── Sidebar nav items ──────────────────────────────────────────
 const NAV_ITEMS = [
-  { id: "sports",   label: "Sports",       href: "/",         badge: null,   icon: <IcoSports /> },
-  { id: "live",     label: "Live Games",   href: "/",         badge: null,   icon: <IcoLive /> },
-  { id: "aviator",  label: "Aviator",      href: "/",         badge: "NEW!", icon: <IcoAviator /> },
-  { id: "casino",   label: "Casino",       href: "/",         badge: null,   icon: <IcoCasino /> },
-  { id: "virtuals", label: "Virtuals",     href: "/",         badge: null,   icon: <IcoVirtuals /> },
-  { id: "jackpots", label: "Jackpots",     href: "/",         badge: "NEW!", icon: <IcoJackpots /> },
-  { id: "lucky",    label: "Lucky Numbers",href: "/",         badge: null,   icon: <IcoLucky /> },
+  { id: "sports",   label: "Sports",        href: "/",              badge: null,   icon: <IcoSports /> },
+  { id: "live",     label: "Live Games",    href: "/",              badge: null,   icon: <IcoLive /> },
+  { id: "aviator",  label: "Aviator",       href: "/aviator",       badge: "NEW!", icon: <IcoAviator /> },
+  { id: "casino",   label: "Casino",        href: "/",              badge: null,   icon: <IcoCasino /> },
+  { id: "virtuals", label: "Virtuals",      href: "/virtuals",      badge: null,   icon: <IcoVirtuals /> },
+  { id: "jackpots", label: "Jackpots",      href: "/jackpots",      badge: "NEW!", icon: <IcoJackpots /> },
+  { id: "lucky",    label: "Lucky Numbers", href: "/lucky-numbers", badge: null,   icon: <IcoLucky /> },
 ];
 
 const ACCOUNT_ITEMS = [

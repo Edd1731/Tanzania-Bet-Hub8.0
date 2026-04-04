@@ -13,6 +13,10 @@ import DepositPage from "@/pages/DepositPage";
 import ProfilePage from "@/pages/ProfilePage";
 import AdminPage from "@/pages/AdminPage";
 import WithdrawPage from "@/pages/WithdrawPage";
+import AviatorPage from "@/pages/AviatorPage";
+import VirtualsPage from "@/pages/VirtualsPage";
+import JackpotPage from "@/pages/JackpotPage";
+import LuckyNumbersPage from "@/pages/LuckyNumbersPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -56,6 +60,10 @@ function AppRoutes() {
           <Route path="/admin">
             <ProtectedRoute component={AdminPage} adminOnly />
           </Route>
+          <Route path="/aviator" component={AviatorPage} />
+          <Route path="/virtuals" component={VirtualsPage} />
+          <Route path="/jackpots" component={JackpotPage} />
+          <Route path="/lucky-numbers" component={LuckyNumbersPage} />
           <Route component={NotFound} />
         </Switch>
       </div>
