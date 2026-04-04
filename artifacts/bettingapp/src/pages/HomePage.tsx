@@ -23,15 +23,200 @@ type BetItem = {
   amount: string;
 };
 
+// ─── Poisson maths engine ─────────────────────────────────────────────────────
+
+function poisson(lambda: number, k: number): number {
+  let p = Math.exp(-lambda);
+  for (let i = 1; i <= k; i++) p *= lambda / i;
+  return Math.max(0, p);
+}
+
+function clip(odds: number, lo = 1.05, hi = 150): number {
+  return Math.round(Math.max(lo, Math.min(hi, odds)) * 100) / 100;
+}
+
 function dcOdds(o1: number, o2: number) {
-  return Math.round((1 / (1 / o1 + 1 / o2)) * 0.95 * 100) / 100;
+  return clip((1 / (1 / o1 + 1 / o2)) * 0.95);
+}
+
+/** Estimate λ_home and λ_away from 1X2 + O/U 2.5 odds using a simple Poisson model. */
+function estimateLambdas(H: number, D: number, A: number, O25: number): [number, number] {
+  const pH = 1 / H, pD = 1 / D, pA = 1 / A;
+  const tot = pH + pD + pA;
+  const ph = pH / tot, pa = pA / tot;
+
+  // Estimate total goals from O/U 2.5 implied probability
+  const pOver = Math.min(0.93, Math.max(0.1, 1 / O25));
+  // Solve P(X > 2) = pOver for Poisson lambda via lookup table approximation
+  const lambdaTotal = 1.0 + pOver * 3.8;
+
+  // Split by relative strength
+  const homeShare = 0.45 + ph * 0.55;
+  const lH = lambdaTotal * homeShare;
+  const lA = lambdaTotal * (1 - homeShare);
+  return [Math.max(0.2, lH), Math.max(0.2, lA)];
+}
+
+/** Build all 36 score probabilities (0..5 × 0..5). */
+function scoreMatrix(lH: number, lA: number) {
+  const mat: { h: number; a: number; p: number }[] = [];
+  for (let h = 0; h <= 5; h++)
+    for (let a = 0; a <= 5; a++)
+      mat.push({ h, a, p: poisson(lH, h) * poisson(lA, a) });
+  return mat;
+}
+
+// ─── Market builders ──────────────────────────────────────────────────────────
+
+function correctScoreSelections(lH: number, lA: number) {
+  const margin = 1.18;
+  return scoreMatrix(lH, lA)
+    .filter(s => s.p > 0.005)
+    .sort((a, b) => b.p - a.p)
+    .slice(0, 16)
+    .sort((a, b) => a.h !== b.h ? a.h - b.h : a.a - b.a)
+    .map(s => ({
+      choice: `cs_${s.h}${s.a}`,
+      label: `${s.h} - ${s.a}`,
+      sublabel: s.h > s.a ? "Home win" : s.h < s.a ? "Away win" : "Draw",
+      odds: clip((1 / s.p) * margin, 1.5, 150),
+    }));
+}
+
+function htResultSelections(lH: number, lA: number) {
+  // First half: roughly 40% of goals
+  const lHh = lH * 0.42, lAh = lA * 0.42;
+  const mat = scoreMatrix(lHh, lAh);
+  const pH1 = mat.filter(s => s.h > s.a).reduce((a, s) => a + s.p, 0);
+  const pD1 = mat.filter(s => s.h === s.a).reduce((a, s) => a + s.p, 0);
+  const pA1 = mat.filter(s => s.h < s.a).reduce((a, s) => a + s.p, 0);
+  const m = 1.12;
+  return [
+    { choice: "ht_h", label: "Home",  sublabel: "1st Half Win", odds: clip((1 / pH1) * m) },
+    { choice: "ht_d", label: "Draw",  sublabel: "1st Half Draw", odds: clip((1 / pD1) * m) },
+    { choice: "ht_a", label: "Away",  sublabel: "1st Half Win", odds: clip((1 / pA1) * m) },
+  ];
+}
+
+function htFtSelections(lH: number, lA: number) {
+  const lHh = lH * 0.42, lAh = lA * 0.42;
+  const htMat = scoreMatrix(lHh, lAh);
+  const ftMat = scoreMatrix(lH, lA);
+
+  const htP = (pred: (h: number, a: number) => boolean) =>
+    htMat.filter(s => pred(s.h, s.a)).reduce((a, s) => a + s.p, 0);
+  const ftP = (pred: (h: number, a: number) => boolean) =>
+    ftMat.filter(s => pred(s.h, s.a)).reduce((a, s) => a + s.p, 0);
+
+  const ph_ht = htP((h, a) => h > a), pd_ht = htP((h, a) => h === a), pa_ht = htP((h, a) => h < a);
+  const ph_ft = ftP((h, a) => h > a), pd_ft = ftP((h, a) => h === a), pa_ft = ftP((h, a) => h < a);
+  const m = 1.15;
+
+  const combos = [
+    { ht: "1", ft: "1", pHt: ph_ht, pFt: ph_ft },
+    { ht: "1", ft: "X", pHt: ph_ht, pFt: pd_ft },
+    { ht: "1", ft: "2", pHt: ph_ht, pFt: pa_ft },
+    { ht: "X", ft: "1", pHt: pd_ht, pFt: ph_ft },
+    { ht: "X", ft: "X", pHt: pd_ht, pFt: pd_ft },
+    { ht: "X", ft: "2", pHt: pd_ht, pFt: pa_ft },
+    { ht: "2", ft: "1", pHt: pa_ht, pFt: ph_ft },
+    { ht: "2", ft: "X", pHt: pa_ht, pFt: pd_ft },
+    { ht: "2", ft: "2", pHt: pa_ht, pFt: pa_ft },
+  ];
+
+  return combos.map(c => ({
+    choice: `htft_${c.ht}${c.ft}`,
+    label: `${c.ht}/${c.ft}`,
+    sublabel: `HT ${c.ht} · FT ${c.ft}`,
+    odds: clip((1 / (c.pHt * c.pFt * 1.05)) * m, 1.5, 150),
+  }));
+}
+
+function winToNilSelections(lH: number, lA: number) {
+  const mat = scoreMatrix(lH, lA);
+  const pHWin0 = mat.filter(s => s.h > s.a && s.a === 0).reduce((a, s) => a + s.p, 0);
+  const pAWin0 = mat.filter(s => s.a > s.h && s.h === 0).reduce((a, s) => a + s.p, 0);
+  const m = 1.12;
+  return [
+    { choice: "wtn_h", label: "Home Win to Nil", sublabel: "Home wins & Away 0", odds: clip((1 / pHWin0) * m) },
+    { choice: "wtn_a", label: "Away Win to Nil", sublabel: "Away wins & Home 0", odds: clip((1 / pAWin0) * m) },
+  ];
+}
+
+function bttsResultSelections(lH: number, lA: number) {
+  const mat = scoreMatrix(lH, lA);
+  const btts = (s: { h: number; a: number }) => s.h > 0 && s.a > 0;
+  const pB1 = mat.filter(s => btts(s) && s.h > s.a).reduce((a, s) => a + s.p, 0);
+  const pBX = mat.filter(s => btts(s) && s.h === s.a).reduce((a, s) => a + s.p, 0);
+  const pB2 = mat.filter(s => btts(s) && s.h < s.a).reduce((a, s) => a + s.p, 0);
+  const pN1 = mat.filter(s => !btts(s) && s.h > s.a).reduce((a, s) => a + s.p, 0);
+  const pNX = mat.filter(s => !btts(s) && s.h === s.a).reduce((a, s) => a + s.p, 0);
+  const pN2 = mat.filter(s => !btts(s) && s.h < s.a).reduce((a, s) => a + s.p, 0);
+  const m = 1.13;
+  return [
+    { choice: "btr_b1", label: "BTTS + Home", sublabel: "Both score & 1 wins", odds: clip((1 / pB1) * m) },
+    { choice: "btr_bx", label: "BTTS + Draw", sublabel: "Both score & draw",   odds: clip((1 / pBX) * m) },
+    { choice: "btr_b2", label: "BTTS + Away", sublabel: "Both score & 2 wins", odds: clip((1 / pB2) * m) },
+    { choice: "btr_n1", label: "No BTTS + Home", sublabel: "Clean sheet & 1",  odds: clip((1 / pN1) * m) },
+    { choice: "btr_nx", label: "No BTTS + Draw", sublabel: "Clean sheet & 0-0",odds: clip((1 / pNX) * m) },
+    { choice: "btr_n2", label: "No BTTS + Away", sublabel: "Clean sheet & 2",  odds: clip((1 / pN2) * m) },
+  ];
+}
+
+function asianHandicapSelections(lH: number, lA: number) {
+  const mat = scoreMatrix(lH, lA);
+  const lines = [-1.5, -1, -0.5, 0, 0.5, 1, 1.5];
+  const out: { choice: string; label: string; sublabel: string; odds: number }[] = [];
+
+  for (const line of lines) {
+    // Home -line: home wins by more than line goals
+    const pHome = mat.reduce((a, s) => {
+      const diff = s.h - s.a;
+      if (diff > line) return a + s.p;
+      if (diff === line) return a + s.p * 0.5; // push (half refund)
+      return a;
+    }, 0);
+    const pAway = 1 - pHome;
+    const lbl = line > 0 ? `+${line}` : `${line}`;
+    out.push(
+      { choice: `ah_h${lbl}`, label: `Home ${lbl}`, sublabel: `Home handicap ${lbl}`, odds: clip((1 / pHome) * 1.1) },
+      { choice: `ah_a${lbl}`, label: `Away ${lbl === `${line}` ? `+${-line}` : `-${-line}`}`, sublabel: `Away handicap`, odds: clip((1 / pAway) * 1.1) },
+    );
+  }
+
+  // Return only the 3 most balanced lines (closest to 2.0)
+  const balanced = out
+    .filter((_, i) => i % 2 === 0)
+    .map((h, i) => ({ h, a: out[i * 2 + 1]! }))
+    .sort((a, b) => Math.abs(a.h.odds - 2) - Math.abs(b.h.odds - 2))
+    .slice(0, 3);
+
+  return balanced.flatMap(b => [b.h, b.a]);
+}
+
+function firstHalfOuSelections(lH: number, lA: number) {
+  const lHh = lH * 0.42, lAh = lA * 0.42;
+  const mat = scoreMatrix(lHh, lAh);
+  const totalGoals = (s: { h: number; a: number }) => s.h + s.a;
+  const over = (n: number) => mat.filter(s => totalGoals(s) > n).reduce((a, s) => a + s.p, 0);
+  const m = 1.1;
+  return [
+    { choice: "ht_o05", label: "Over 0.5",  sublabel: "1st Half",  odds: clip((1 / over(0.5)) * m) },
+    { choice: "ht_u05", label: "Under 0.5", sublabel: "1st Half",  odds: clip((1 / (1 - over(0.5))) * m) },
+    { choice: "ht_o15", label: "Over 1.5",  sublabel: "1st Half",  odds: clip((1 / over(1.5)) * m) },
+    { choice: "ht_u15", label: "Under 1.5", sublabel: "1st Half",  odds: clip((1 / (1 - over(1.5))) * m) },
+  ];
 }
 
 function buildMarkets(ev: Event) {
   const H = ev.oddsHome, D = ev.oddsDraw, A = ev.oddsAway;
+  const O25 = ev.oddsO25 ?? 1.85;
+  const [lH, lA] = estimateLambdas(H, D, A, O25);
+
   return [
     {
       id: "dc", label: "Double Chance",
+      cols: 3,
       selections: [
         { choice: "dc_1x", label: "1X", sublabel: "Home or Draw", odds: dcOdds(H, D) },
         { choice: "dc_x2", label: "X2", sublabel: "Draw or Away", odds: dcOdds(D, A) },
@@ -40,21 +225,58 @@ function buildMarkets(ev: Event) {
     },
     {
       id: "ou", label: "Over / Under Goals",
+      cols: 2,
       selections: [
-        { choice: "ou_o15", label: "Over 1.5", sublabel: "", odds: ev.oddsO15 ?? 1.25 },
+        { choice: "ou_o15", label: "Over 1.5",  sublabel: "", odds: ev.oddsO15 ?? 1.25 },
         { choice: "ou_u15", label: "Under 1.5", sublabel: "", odds: ev.oddsU15 ?? 3.50 },
-        { choice: "ou_o25", label: "Over 2.5", sublabel: "", odds: ev.oddsO25 ?? 1.90 },
+        { choice: "ou_o25", label: "Over 2.5",  sublabel: "", odds: ev.oddsO25 ?? 1.90 },
         { choice: "ou_u25", label: "Under 2.5", sublabel: "", odds: ev.oddsU25 ?? 1.85 },
-        { choice: "ou_o35", label: "Over 3.5", sublabel: "", odds: ev.oddsO35 ?? 2.80 },
+        { choice: "ou_o35", label: "Over 3.5",  sublabel: "", odds: ev.oddsO35 ?? 2.80 },
         { choice: "ou_u35", label: "Under 3.5", sublabel: "", odds: ev.oddsU35 ?? 1.40 },
       ],
     },
     {
       id: "btts", label: "Both Teams to Score",
+      cols: 2,
       selections: [
         { choice: "btts_yes", label: "Yes", sublabel: "Both score", odds: ev.oddsBttsY ?? 1.75 },
         { choice: "btts_no",  label: "No",  sublabel: "Not both",  odds: ev.oddsBttsN ?? 1.95 },
       ],
+    },
+    {
+      id: "cs", label: "Correct Score",
+      cols: 4,
+      selections: correctScoreSelections(lH, lA),
+    },
+    {
+      id: "ht", label: "1st Half Result",
+      cols: 3,
+      selections: htResultSelections(lH, lA),
+    },
+    {
+      id: "htou", label: "1st Half Over / Under",
+      cols: 2,
+      selections: firstHalfOuSelections(lH, lA),
+    },
+    {
+      id: "htft", label: "Half Time / Full Time",
+      cols: 3,
+      selections: htFtSelections(lH, lA),
+    },
+    {
+      id: "wtn", label: "Win to Nil",
+      cols: 2,
+      selections: winToNilSelections(lH, lA),
+    },
+    {
+      id: "btr", label: "BTTS + Result",
+      cols: 3,
+      selections: bttsResultSelections(lH, lA),
+    },
+    {
+      id: "ah", label: "Asian Handicap",
+      cols: 2,
+      selections: asianHandicapSelections(lH, lA),
     },
   ];
 }
@@ -400,34 +622,42 @@ export default function HomePage() {
         {/* Expanded markets */}
         {isOpen && (
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-            {markets.map(market => (
-              <div key={market.id} className="px-3 py-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                <div className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">{market.label}</div>
-                <div className={`grid gap-1.5 ${market.selections.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
-                  {market.selections.map(sel => {
-                    const selected = inSlip?.choice === sel.choice;
-                    return (
-                      <button
-                        key={sel.choice}
-                        onClick={() => addToBetSlip(event.id, event.teamHome, event.teamAway, sel.choice, `${market.label}: ${sel.label}`, sel.odds)}
-                        className="rounded-lg py-2 px-1 text-center transition-all active:scale-95"
-                        style={{
-                          background: selected ? GREEN : "rgba(255,255,255,0.05)",
-                          border: `1px solid ${selected ? GREEN : "rgba(255,255,255,0.07)"}`,
-                        }}
-                      >
-                        <div className="text-[9px] font-semibold mb-0.5 truncate" style={{ color: selected ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.45)" }}>
-                          {sel.label}
-                        </div>
-                        <div className="text-sm font-black" style={{ color: selected ? "#fff" : GOLD }}>
-                          {sel.odds.toFixed(2)}
-                        </div>
-                      </button>
-                    );
-                  })}
+            {markets.map(market => {
+              const colClass = market.cols === 4 ? "grid-cols-4" : market.cols === 2 ? "grid-cols-2" : "grid-cols-3";
+              return (
+                <div key={market.id} className="px-3 py-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                  <div className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">{market.label}</div>
+                  <div className={`grid gap-1 ${colClass}`}>
+                    {market.selections.map(sel => {
+                      const selected = inSlip?.choice === sel.choice;
+                      return (
+                        <button
+                          key={sel.choice}
+                          onClick={() => addToBetSlip(event.id, event.teamHome, event.teamAway, sel.choice, `${market.label}: ${sel.label}`, sel.odds)}
+                          className="rounded-lg py-1.5 px-0.5 text-center transition-all active:scale-95"
+                          style={{
+                            background: selected ? GREEN : "rgba(255,255,255,0.05)",
+                            border: `1px solid ${selected ? GREEN : "rgba(255,255,255,0.07)"}`,
+                          }}
+                        >
+                          {"sublabel" in sel && sel.sublabel ? (
+                            <div className="text-[8px] leading-tight truncate mb-0.5" style={{ color: selected ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.35)" }}>
+                              {sel.sublabel}
+                            </div>
+                          ) : null}
+                          <div className="text-[10px] font-black truncate" style={{ color: selected ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.55)" }}>
+                            {sel.label}
+                          </div>
+                          <div className="text-xs font-black leading-tight" style={{ color: selected ? "#fff" : GOLD }}>
+                            {sel.odds.toFixed(2)}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
