@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTranslation } from "@/hooks/use-translation";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { getGetEventsQueryKey, getGetStatsSummaryQueryKey, getGetMeQueryKey } from "@workspace/api-client-react";
+import { getGetStatsSummaryQueryKey, getGetMeQueryKey } from "@workspace/api-client-react";
 
 type BetItem = {
   eventId: number;
@@ -24,6 +24,7 @@ export default function HomePage() {
   const placeBet = usePlaceBet();
 
   const [betSlip, setBetSlip] = useState<BetItem[]>([]);
+  const [slipOpen, setSlipOpen] = useState(false);
   const [placingBet, setPlacingBet] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -35,8 +36,11 @@ export default function HomePage() {
     setBetSlip(prev => {
       const existing = prev.findIndex(b => b.eventId === eventId);
       if (existing >= 0) {
+        if (prev[existing].choice === choice) {
+          return prev.filter(b => b.eventId !== eventId);
+        }
         const updated = [...prev];
-        updated[existing] = { eventId, teamHome, teamAway, choice, odds, amount: updated[existing].amount };
+        updated[existing] = { ...updated[existing], choice, odds };
         return updated;
       }
       return [...prev, { eventId, teamHome, teamAway, choice, odds, amount: "1000" }];
@@ -54,6 +58,7 @@ export default function HomePage() {
   };
 
   const totalStake = betSlip.reduce((s, b) => s + (parseFloat(b.amount) || 0), 0);
+  const totalPotential = betSlip.reduce((s, b) => s + (parseFloat(b.amount) || 0) * b.odds, 0);
 
   const handlePlaceAll = async () => {
     if (!user) { navigate("/login"); return; }
@@ -67,7 +72,8 @@ export default function HomePage() {
         await placeBet.mutateAsync({ data: { eventId: bet.eventId, choice: bet.choice, amount: amt } });
       }
       setBetSlip([]);
-      setSuccessMsg(t("my_bets") + " - " + t("pending"));
+      setSlipOpen(false);
+      setSuccessMsg("✓ Bets placed successfully!");
       qc.invalidateQueries({ queryKey: getGetMeQueryKey() });
       qc.invalidateQueries({ queryKey: getGetStatsSummaryQueryKey() });
     } catch (err: any) {
@@ -76,97 +82,208 @@ export default function HomePage() {
     setPlacingBet(false);
   };
 
-  const choiceLabel = (choice: "home" | "draw" | "away") => {
-    if (choice === "home") return t("home");
-    if (choice === "draw") return t("draw");
-    return t("away");
-  };
+  const choiceCode = (c: "home" | "draw" | "away") => c === "home" ? "1" : c === "draw" ? "X" : "2";
+
+  // Group events by league
+  const grouped: Record<string, typeof events> = {};
+  (events ?? []).forEach(ev => {
+    if (!grouped[ev.league]) grouped[ev.league] = [];
+    grouped[ev.league]!.push(ev);
+  });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6">
-      <div className="flex gap-6">
-        {/* Events List */}
-        <div className="flex-1 min-w-0">
-          <div className="mb-4">
-            <h1 className="text-2xl font-black text-foreground">{t("events")}</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">NBC Premier League & International</p>
-          </div>
+    <div className="pb-36 sm:pb-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex gap-0 sm:gap-6">
 
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1,2,3].map(i => (
-                <div key={i} className="h-24 bg-card rounded-xl animate-pulse border border-border" />
-              ))}
+          {/* ── Events list ── */}
+          <div className="flex-1 min-w-0">
+            {/* Header */}
+            <div className="px-3 pt-4 pb-2 flex items-center justify-between">
+              <div>
+                <h1 className="text-lg font-black text-foreground">{t("events")}</h1>
+                <p className="text-xs text-muted-foreground">NBC Premier League &amp; International</p>
+              </div>
+              {successMsg && (
+                <div className="text-xs text-green-400 bg-green-400/10 border border-green-400/20 rounded-lg px-2 py-1">{successMsg}</div>
+              )}
             </div>
-          ) : events?.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground">{t("no_events")}</div>
-          ) : (
-            <div className="space-y-3">
-              {events?.map(event => {
-                const inSlip = betSlip.find(b => b.eventId === event.id);
-                return (
-                  <div key={event.id} className={`rounded-xl border transition-all duration-200 overflow-hidden ${inSlip ? "border-primary/60 bg-primary/5" : "border-border bg-card hover:border-border/80"}`}>
-                    <div className="px-4 py-3">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs font-semibold text-primary uppercase tracking-wide">{event.league}</span>
-                        <span className="text-xs text-muted-foreground">{event.status}</span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="flex-1 text-center">
-                          <div className="font-bold text-foreground text-sm sm:text-base">{event.teamHome}</div>
-                        </div>
-                        <div className="text-xs font-bold text-muted-foreground px-2">VS</div>
-                        <div className="flex-1 text-center">
-                          <div className="font-bold text-foreground text-sm sm:text-base">{event.teamAway}</div>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 mt-3">
-                        {([
-                          { key: "home" as const, label: t("home"), odds: event.oddsHome },
-                          { key: "draw" as const, label: t("draw"), odds: event.oddsDraw },
-                          { key: "away" as const, label: t("away"), odds: event.oddsAway },
-                        ]).map(opt => (
-                          <button
-                            key={opt.key}
-                            onClick={() => addToBetSlip(event.id, event.teamHome, event.teamAway, opt.key, opt.odds)}
-                            className={`rounded-lg py-2 px-3 text-center transition-all duration-150 border ${
-                              inSlip?.choice === opt.key
-                                ? "bg-primary text-primary-foreground border-primary font-bold"
-                                : "bg-muted border-border text-foreground hover:border-primary hover:bg-accent"
-                            }`}
-                          >
-                            <div className="text-[10px] text-muted-foreground mb-0.5">{opt.label}</div>
-                            <div className="text-base font-black">{opt.odds.toFixed(2)}</div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
-        {/* Bet Slip */}
-        <div className="hidden lg:block w-80 shrink-0">
-          <div className="sticky top-20 bg-card border border-border rounded-xl overflow-hidden">
-            <div className="px-4 py-3 bg-primary/10 border-b border-border">
-              <h2 className="font-black text-foreground text-sm">{t("bet_slip")} {betSlip.length > 0 && <span className="bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs ml-1">{betSlip.length}</span>}</h2>
-            </div>
-            {betSlip.length === 0 ? (
-              <div className="px-4 py-10 text-center text-sm text-muted-foreground">{t("empty_slip")}</div>
+            {isLoading ? (
+              <div className="px-3 space-y-2">
+                {[1,2,3,4].map(i => (
+                  <div key={i} className="h-28 bg-card rounded-xl animate-pulse border border-border" />
+                ))}
+              </div>
+            ) : (events ?? []).length === 0 ? (
+              <div className="text-center py-20 text-muted-foreground">{t("no_events")}</div>
             ) : (
               <div>
-                <div className="max-h-80 overflow-y-auto">
+                {Object.entries(grouped).map(([league, leagueEvents]) => (
+                  <div key={league}>
+                    {/* League header */}
+                    <div className="flex items-center gap-2 px-3 py-2 mt-2">
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0" style={{ background: "#1B8A3C" }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="white">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+                        </svg>
+                      </div>
+                      <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{league}</span>
+                    </div>
+
+                    {/* Match cards */}
+                    <div className="px-3 space-y-2">
+                      {leagueEvents?.map(event => {
+                        const inSlip = betSlip.find(b => b.eventId === event.id);
+                        return (
+                          <div
+                            key={event.id}
+                            className={`rounded-xl border overflow-hidden transition-all ${
+                              inSlip ? "border-primary/50 bg-primary/5" : "border-border bg-card"
+                            }`}
+                          >
+                            {/* Match teams row */}
+                            <div className="px-3 pt-3 pb-2">
+                              <div className="flex items-center justify-between mb-2.5">
+                                {/* Home team */}
+                                <div className="flex-1 text-left">
+                                  <span className="text-sm font-bold text-foreground leading-tight">{event.teamHome}</span>
+                                </div>
+
+                                {/* VS badge */}
+                                <div className="mx-2 shrink-0">
+                                  <span className="text-[10px] font-black text-muted-foreground bg-muted px-2 py-0.5 rounded-full">VS</span>
+                                </div>
+
+                                {/* Away team */}
+                                <div className="flex-1 text-right">
+                                  <span className="text-sm font-bold text-foreground leading-tight">{event.teamAway}</span>
+                                </div>
+                              </div>
+
+                              {/* 1 / X / 2 buttons */}
+                              <div className="grid grid-cols-3 gap-1.5">
+                                {([
+                                  { key: "home" as const, code: "1", label: t("home"), odds: event.oddsHome },
+                                  { key: "draw" as const, code: "X", label: t("draw"), odds: event.oddsDraw },
+                                  { key: "away" as const, code: "2", label: t("away"), odds: event.oddsAway },
+                                ]).map(opt => {
+                                  const selected = inSlip?.choice === opt.key;
+                                  return (
+                                    <button
+                                      key={opt.key}
+                                      onClick={() => addToBetSlip(event.id, event.teamHome, event.teamAway, opt.key, opt.odds)}
+                                      className={`relative rounded-lg py-2.5 px-2 text-center transition-all active:scale-95 border ${
+                                        selected
+                                          ? "bg-primary border-primary text-primary-foreground shadow-md"
+                                          : "bg-muted/80 border-border text-foreground hover:border-primary/60 hover:bg-accent"
+                                      }`}
+                                    >
+                                      <div className={`text-[10px] font-bold mb-0.5 ${selected ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+                                        {opt.code} · {opt.label}
+                                      </div>
+                                      <div className="text-base font-black leading-none">{opt.odds.toFixed(2)}</div>
+                                      {selected && (
+                                        <div className="absolute top-1 right-1 w-2 h-2 bg-primary-foreground/80 rounded-full" />
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Status strip */}
+                            <div className="px-3 py-1.5 bg-muted/30 border-t border-border/50 flex items-center justify-between">
+                              <span className="text-[10px] text-muted-foreground">{event.league}</span>
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                                event.status === "active" ? "text-green-400 bg-green-400/10" : "text-muted-foreground bg-muted"
+                              }`}>
+                                {event.status === "active" ? "● LIVE" : event.status}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── Desktop Bet Slip (sidebar) ── */}
+          <div className="hidden lg:block w-80 shrink-0 px-0 pt-4">
+            <BetSlipPanel
+              betSlip={betSlip}
+              totalStake={totalStake}
+              totalPotential={totalPotential}
+              placingBet={placingBet}
+              successMsg={successMsg}
+              errorMsg={errorMsg}
+              user={user}
+              t={t}
+              choiceCode={choiceCode}
+              removeFromSlip={removeFromSlip}
+              updateAmount={updateAmount}
+              handlePlaceAll={handlePlaceAll}
+              navigate={navigate}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Mobile Bet Slip (bottom sheet) ── */}
+      <div className="lg:hidden">
+        {betSlip.length > 0 && (
+          <>
+            {/* Backdrop */}
+            {slipOpen && (
+              <div
+                className="fixed inset-0 bg-black/60 z-30"
+                onClick={() => setSlipOpen(false)}
+              />
+            )}
+
+            {/* Sheet */}
+            <div
+              className={`fixed left-0 right-0 z-50 bg-card border-t border-border transition-all duration-300 ease-out rounded-t-2xl ${
+                slipOpen ? "max-h-[80vh]" : "max-h-24"
+              } overflow-hidden flex flex-col`}
+              style={{ bottom: user ? "56px" : "0" }}
+            >
+              {/* Handle bar + summary row */}
+              <button
+                className="w-full flex flex-col items-center pt-2 pb-0 shrink-0"
+                onClick={() => setSlipOpen(!slipOpen)}
+              >
+                <div className="w-10 h-1 bg-border rounded-full mb-2" />
+                <div className="w-full px-4 pb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-black text-foreground">{t("bet_slip")}</span>
+                    <span className="bg-primary text-primary-foreground text-xs font-black px-2 py-0.5 rounded-full">{betSlip.length}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground">Stake: <span className="text-foreground font-bold">TZS {totalStake.toLocaleString()}</span></span>
+                    <svg className={`w-4 h-4 text-muted-foreground transition-transform ${slipOpen ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="m18 15-6-6-6 6"/>
+                    </svg>
+                  </div>
+                </div>
+              </button>
+
+              {/* Expanded content */}
+              {slipOpen && (
+                <div className="flex-1 overflow-y-auto px-4">
                   {betSlip.map(bet => (
-                    <div key={bet.eventId} className="px-4 py-3 border-b border-border/50">
+                    <div key={bet.eventId} className="py-3 border-b border-border/50">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold text-foreground truncate">{bet.teamHome} v {bet.teamAway}</div>
-                          <div className="text-xs text-primary font-bold">{choiceLabel(bet.choice)} @ {bet.odds.toFixed(2)}</div>
+                          <div className="text-xs font-bold text-foreground truncate">{bet.teamHome} v {bet.teamAway}</div>
+                          <div className="text-xs text-primary font-semibold mt-0.5">
+                            {choiceCode(bet.choice)} · {bet.choice} @ {bet.odds.toFixed(2)}
+                          </div>
                         </div>
-                        <button onClick={() => removeFromSlip(bet.eventId)} className="text-muted-foreground hover:text-destructive text-xs shrink-0">X</button>
+                        <button onClick={() => removeFromSlip(bet.eventId)} className="w-6 h-6 flex items-center justify-center rounded-full bg-destructive/10 text-destructive text-xs shrink-0">✕</button>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground shrink-0">TZS</span>
@@ -174,55 +291,136 @@ export default function HomePage() {
                           type="number"
                           value={bet.amount}
                           onChange={e => updateAmount(bet.eventId, e.target.value)}
-                          className="flex-1 bg-background border border-input rounded px-2 py-1 text-sm text-foreground w-0"
+                          className="flex-1 bg-background border border-input rounded-lg px-3 py-1.5 text-sm text-foreground"
                           min="100"
                         />
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        {t("potential_win")}: <span className="text-primary font-bold">TZS {((parseFloat(bet.amount) || 0) * bet.odds).toLocaleString()}</span>
+                        Win: <span className="text-primary font-bold">TZS {((parseFloat(bet.amount) || 0) * bet.odds).toLocaleString()}</span>
                       </div>
                     </div>
                   ))}
-                </div>
-                <div className="px-4 py-3">
-                  <div className="flex justify-between text-sm mb-3">
-                    <span className="text-muted-foreground">{t("total_stake")}</span>
-                    <span className="font-bold text-foreground">TZS {totalStake.toLocaleString()}</span>
+
+                  <div className="py-3 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total Stake</span>
+                      <span className="font-bold">TZS {totalStake.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Potential Win</span>
+                      <span className="font-black text-primary">TZS {totalPotential.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                    </div>
+                    {errorMsg && <div className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">{errorMsg}</div>}
+                    {successMsg && <div className="text-xs text-green-400 bg-green-400/10 rounded-lg px-3 py-2">{successMsg}</div>}
+                    <button
+                      onClick={handlePlaceAll}
+                      disabled={placingBet}
+                      className="w-full bg-primary text-primary-foreground font-black py-3.5 rounded-xl text-sm disabled:opacity-50 active:scale-98 transition-all"
+                    >
+                      {placingBet ? "Placing bets..." : `${t("place_bet")} · ${betSlip.length} selection${betSlip.length > 1 ? "s" : ""}`}
+                    </button>
+                    {!user && (
+                      <p className="text-xs text-center text-muted-foreground">You need to <span className="text-primary font-semibold">login</span> to place bets</p>
+                    )}
                   </div>
-                  {successMsg && <div className="mb-2 text-xs text-green-400 bg-green-400/10 rounded px-2 py-1">{successMsg}</div>}
-                  {errorMsg && <div className="mb-2 text-xs text-destructive bg-destructive/10 rounded px-2 py-1">{errorMsg}</div>}
+                </div>
+              )}
+
+              {/* Collapsed: just show the place bet button */}
+              {!slipOpen && (
+                <div className="px-4 pb-3 shrink-0">
                   <button
-                    onClick={handlePlaceAll}
-                    disabled={placingBet}
-                    className="w-full bg-primary text-primary-foreground font-black py-2.5 rounded-lg text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
+                    onClick={() => { if (!user) { navigate("/login"); return; } setSlipOpen(true); }}
+                    className="w-full bg-primary text-primary-foreground font-black py-3 rounded-xl text-sm"
                   >
-                    {placingBet ? "..." : t("place_bet")}
+                    {t("place_bet")} · {betSlip.length} selection{betSlip.length > 1 ? "s" : ""}
                   </button>
-                  {!user && (
-                    <p className="text-xs text-center text-muted-foreground mt-2">{t("login")} / {t("register")}</p>
-                  )}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BetSlipPanel({
+  betSlip, totalStake, totalPotential, placingBet, successMsg, errorMsg,
+  user, t, choiceCode, removeFromSlip, updateAmount, handlePlaceAll, navigate
+}: {
+  betSlip: BetItem[]; totalStake: number; totalPotential: number;
+  placingBet: boolean; successMsg: string; errorMsg: string;
+  user: any; t: (k: string) => string; choiceCode: (c: "home"|"draw"|"away") => string;
+  removeFromSlip: (id: number) => void; updateAmount: (id: number, v: string) => void;
+  handlePlaceAll: () => void; navigate: (path: string) => void;
+}) {
+  return (
+    <div className="sticky top-20 bg-card border border-border rounded-xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between" style={{ background: "rgba(var(--primary)/0.1)" }}>
+        <h2 className="font-black text-foreground text-sm">{t("bet_slip")}</h2>
+        {betSlip.length > 0 && <span className="bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs font-black">{betSlip.length}</span>}
+      </div>
+      {betSlip.length === 0 ? (
+        <div className="px-4 py-10 text-center">
+          <div className="text-3xl mb-2">🎯</div>
+          <div className="text-sm text-muted-foreground">{t("empty_slip")}</div>
+          <div className="text-xs text-muted-foreground/60 mt-1">Click any odds to add a bet</div>
+        </div>
+      ) : (
+        <div>
+          <div className="max-h-96 overflow-y-auto">
+            {betSlip.map(bet => (
+              <div key={bet.eventId} className="px-4 py-3 border-b border-border/50">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-foreground truncate">{bet.teamHome} v {bet.teamAway}</div>
+                    <div className="text-xs text-primary font-semibold mt-0.5">
+                      {choiceCode(bet.choice)} · {bet.choice} @ {bet.odds.toFixed(2)}
+                    </div>
+                  </div>
+                  <button onClick={() => removeFromSlip(bet.eventId)} className="w-5 h-5 flex items-center justify-center rounded-full bg-destructive/10 text-destructive text-[10px] shrink-0">✕</button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground shrink-0">TZS</span>
+                  <input
+                    type="number"
+                    value={bet.amount}
+                    onChange={e => updateAmount(bet.eventId, e.target.value)}
+                    className="flex-1 bg-background border border-input rounded-lg px-2 py-1.5 text-sm text-foreground w-0"
+                    min="100"
+                  />
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Win: <span className="text-primary font-bold">TZS {((parseFloat(bet.amount) || 0) * bet.odds).toLocaleString()}</span>
                 </div>
               </div>
+            ))}
+          </div>
+          <div className="px-4 py-3 space-y-2">
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">{t("total_stake")}</span>
+              <span className="font-bold text-foreground">TZS {totalStake.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Potential Win</span>
+              <span className="font-black text-primary">TZS {totalPotential.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+            </div>
+            {successMsg && <div className="text-xs text-green-400 bg-green-400/10 rounded-lg px-2 py-1.5">{successMsg}</div>}
+            {errorMsg && <div className="text-xs text-destructive bg-destructive/10 rounded-lg px-2 py-1.5">{errorMsg}</div>}
+            <button
+              onClick={handlePlaceAll}
+              disabled={placingBet}
+              className="w-full bg-primary text-primary-foreground font-black py-2.5 rounded-xl text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {placingBet ? "Placing..." : t("place_bet")}
+            </button>
+            {!user && (
+              <button onClick={() => navigate("/login")} className="w-full text-xs text-center text-primary hover:underline">
+                {t("login")} to place bets
+              </button>
             )}
           </div>
-        </div>
-      </div>
-
-      {/* Mobile bet slip */}
-      {betSlip.length > 0 && (
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-bold">{t("bet_slip")} ({betSlip.length})</span>
-            <span className="text-sm text-muted-foreground">TZS {totalStake.toLocaleString()}</span>
-          </div>
-          {errorMsg && <div className="mb-2 text-xs text-destructive">{errorMsg}</div>}
-          <button
-            onClick={handlePlaceAll}
-            disabled={placingBet}
-            className="w-full bg-primary text-primary-foreground font-black py-2.5 rounded-lg text-sm"
-          >
-            {placingBet ? "..." : t("place_bet")}
-          </button>
         </div>
       )}
     </div>

@@ -31,9 +31,12 @@ function ProtectedRoute({ component: Component, adminOnly }: { component: () => 
 }
 
 function AppRoutes() {
+  const { user } = useAuth();
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+      {/* bottom padding on mobile for logged-in users (bottom nav = 56px) */}
+      <div className={user ? "sm:pb-0 pb-14" : ""}>
       <Switch>
         <Route path="/" component={HomePage} />
         <Route path="/login" component={LoginPage} />
@@ -52,6 +55,7 @@ function AppRoutes() {
         </Route>
         <Route component={NotFound} />
       </Switch>
+      </div>
     </div>
   );
 }
