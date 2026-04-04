@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useGetEvents, usePlaceBet } from "@workspace/api-client-react";
 import type { Event } from "@workspace/api-client-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,10 +7,11 @@ import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetStatsSummaryQueryKey, getGetMeQueryKey } from "@workspace/api-client-react";
 
-const GOLD = "#FDD017";
-const NAVY = "#0d1f3c";
+const GOLD  = "#FDD017";
+const NAVY  = "#0d1f3c";
 const NAVY2 = "#0a1628";
 const GREEN = "#1B8A3C";
+const ITEMS_PER_PAGE = 10;
 
 type BetItem = {
   eventId: number;
@@ -58,7 +59,6 @@ function buildMarkets(ev: Event) {
   ];
 }
 
-// Odds filter thresholds
 const ODD_FILTERS = [
   { label: "Under 1.20", max: 1.20 },
   { label: "Under 1.50", max: 1.50 },
@@ -66,19 +66,108 @@ const ODD_FILTERS = [
 ] as const;
 
 const SPORT_CATS = [
-  { id: "football", label: "Football", icon: "⚽", active: true },
-  { id: "basketball", label: "Basketball", icon: "🏀", active: false },
-  { id: "tennis", label: "Tennis", icon: "🎾", active: false },
-  { id: "efootball", label: "eFootball", icon: "🎮", active: false },
+  { id: "football",   label: "Football",   icon: "⚽" },
+  { id: "basketball", label: "Basketball", icon: "🏀" },
+  { id: "tennis",     label: "Tennis",     icon: "🎾" },
+  { id: "efootball",  label: "eFootball",  icon: "🎮" },
 ];
 
 const TOP_TABS = [
-  { id: "sports", label: "Sports", badge: null },
-  { id: "live",   label: "Live",   badge: "LIVE" },
-  { id: "aviator",label: "Aviator",badge: "NEW" },
-  { id: "casino", label: "Casino", badge: null },
-  { id: "virtuals",label:"Virtuals",badge: null },
+  { id: "sports",  label: "Sports",  badge: null },
+  { id: "live",    label: "Live",    badge: "LIVE" },
+  { id: "aviator", label: "Aviator", badge: "NEW" },
+  { id: "casino",  label: "Casino",  badge: null },
+  { id: "virtuals",label: "Virtuals",badge: null },
 ];
+
+// ─── Pagination component ─────────────────────────────────────────────────────
+function Pagination({ current, total, onChange }: { current: number; total: number; onChange: (p: number) => void }) {
+  if (total <= 1) return null;
+
+  const buildPages = () => {
+    const pages: (number | "…")[] = [];
+    if (total <= 7) {
+      for (let i = 1; i <= total; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (current > 3) pages.push("…");
+      for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.push(i);
+      if (current < total - 2) pages.push("…");
+      pages.push(total);
+    }
+    return pages;
+  };
+
+  return (
+    <div className="flex items-center justify-center gap-1 py-4 flex-wrap">
+      {/* Prev */}
+      <button
+        disabled={current === 1}
+        onClick={() => onChange(current - 1)}
+        className="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all disabled:opacity-30"
+        style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)" }}
+      >
+        ‹
+      </button>
+
+      {buildPages().map((p, i) =>
+        p === "…" ? (
+          <span key={`e-${i}`} className="w-7 h-8 flex items-center justify-center text-white/25 text-xs">…</span>
+        ) : (
+          <button
+            key={p}
+            onClick={() => onChange(p as number)}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-black transition-all"
+            style={{
+              background: current === p ? GOLD : "rgba(255,255,255,0.06)",
+              color: current === p ? "#000" : "rgba(255,255,255,0.55)",
+              border: current === p ? `1px solid ${GOLD}` : "1px solid transparent",
+            }}
+          >
+            {p}
+          </button>
+        )
+      )}
+
+      {/* Next */}
+      <button
+        disabled={current === total}
+        onClick={() => onChange(current + 1)}
+        className="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all disabled:opacity-30"
+        style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)" }}
+      >
+        ›
+      </button>
+    </div>
+  );
+}
+
+// ─── League group header ──────────────────────────────────────────────────────
+function LeagueHeader({ league, count, logoUrl, country }: { league: string; count: number; logoUrl?: string; country?: string }) {
+  return (
+    <div
+      className="flex items-center gap-2 px-3 py-2 rounded-t-xl"
+      style={{ background: "#0c1a30", borderLeft: `3px solid ${GREEN}` }}
+    >
+      {logoUrl ? (
+        <img src={logoUrl} alt={league} className="w-4 h-4 object-contain shrink-0"
+          onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+      ) : (
+        <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ background: GREEN }}>
+          <span className="text-[8px] text-white font-black">⚽</span>
+        </div>
+      )}
+      <div>
+        <span className="text-[11px] font-black text-white/70 uppercase tracking-widest">{league}</span>
+        {country && <span className="text-[9px] text-white/30 ml-1.5">{country}</span>}
+      </div>
+      <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full text-white/40"
+        style={{ background: "rgba(255,255,255,0.05)" }}>
+        {count} match{count > 1 ? "es" : ""}
+      </span>
+    </div>
+  );
+}
 
 export default function HomePage() {
   const { t } = useTranslation();
@@ -86,20 +175,72 @@ export default function HomePage() {
   const [, navigate] = useLocation();
   const qc = useQueryClient();
   const { data: events, isLoading } = useGetEvents({
-    query: { refetchInterval: 30_000 }, // auto-refresh every 30 s for live scores
+    query: { refetchInterval: 30_000 },
   });
   const placeBet = usePlaceBet();
 
-  const [activeTab, setActiveTab]       = useState("sports");
-  const [activeSport, setActiveSport]   = useState("football");
+  const [activeTab, setActiveTab]             = useState("sports");
+  const [activeSport, setActiveSport]         = useState("football");
   const [activeOddFilter, setActiveOddFilter] = useState<number | null>(null);
-  const [betSlip, setBetSlip]           = useState<BetItem[]>([]);
-  const [slipOpen, setSlipOpen]         = useState(false);
+  const [betSlip, setBetSlip]                 = useState<BetItem[]>([]);
+  const [slipOpen, setSlipOpen]               = useState(false);
   const [expandedMarkets, setExpandedMarkets] = useState<Set<number>>(new Set());
-  const [placingBet, setPlacingBet]     = useState(false);
-  const [successMsg, setSuccessMsg]     = useState("");
-  const [errorMsg, setErrorMsg]         = useState("");
+  const [placingBet, setPlacingBet]           = useState(false);
+  const [successMsg, setSuccessMsg]           = useState("");
+  const [errorMsg, setErrorMsg]               = useState("");
+  const [upcomingPage, setUpcomingPage]       = useState(1);
+  const [livePage, setLivePage]               = useState(1);
 
+  // Reset pages when filters change
+  useEffect(() => { setUpcomingPage(1); setLivePage(1); }, [activeTab, activeOddFilter, activeSport]);
+
+  const LIVE_STATUS = new Set(["1H", "2H", "HT", "ET", "P", "BT", "INT", "LIVE"]);
+  const isLiveMatch = (ev: Event) => LIVE_STATUS.has(ev.statusShort ?? "NS");
+  const isFinished  = (ev: Event) => ["FT", "AET", "PEN", "AWD", "WO"].includes(ev.statusShort ?? "");
+
+  const applyOddFilter = (evs: Event[]) => {
+    if (activeOddFilter === null) return evs;
+    return evs.filter(ev => ev.oddsHome <= activeOddFilter || ev.oddsDraw <= activeOddFilter || ev.oddsAway <= activeOddFilter);
+  };
+
+  const allEvents = events ?? [];
+
+  // Live events: ongoing right now
+  const liveEvents = applyOddFilter(
+    allEvents.filter(ev => isLiveMatch(ev))
+  );
+
+  // Upcoming events: not started, not finished
+  const upcomingEvents = applyOddFilter(
+    allEvents
+      .filter(ev => !isLiveMatch(ev) && !isFinished(ev))
+      .sort((a, b) => new Date(a.startsAt ?? 0).getTime() - new Date(b.startsAt ?? 0).getTime())
+  );
+
+  // Pagination
+  const totalUpcomingPages = Math.max(1, Math.ceil(upcomingEvents.length / ITEMS_PER_PAGE));
+  const totalLivePages     = Math.max(1, Math.ceil(liveEvents.length / ITEMS_PER_PAGE));
+
+  const pagedLive     = liveEvents.slice((livePage - 1) * ITEMS_PER_PAGE, livePage * ITEMS_PER_PAGE);
+  const pagedUpcoming = upcomingEvents.slice((upcomingPage - 1) * ITEMS_PER_PAGE, upcomingPage * ITEMS_PER_PAGE);
+
+  // Group by league
+  const groupByLeague = (evs: Event[]) => {
+    const grouped: Record<string, Event[]> = {};
+    evs.forEach(ev => {
+      const key = ev.league || "Other";
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(ev);
+    });
+    return grouped;
+  };
+
+  const liveGrouped     = groupByLeague(pagedLive);
+  const upcomingGrouped = groupByLeague(pagedUpcoming);
+
+  const liveCount = allEvents.filter(isLiveMatch).length;
+
+  // ── Bet slip helpers ──────────────────────────────────────────────────────
   const toggleMarkets = (eventId: number) => {
     setExpandedMarkets(prev => {
       const next = new Set(prev);
@@ -108,10 +249,7 @@ export default function HomePage() {
     });
   };
 
-  const addToBetSlip = (
-    eventId: number, teamHome: string, teamAway: string,
-    choice: string, label: string, odds: number
-  ) => {
+  const addToBetSlip = (eventId: number, teamHome: string, teamAway: string, choice: string, label: string, odds: number) => {
     setBetSlip(prev => {
       const idx = prev.findIndex(b => b.eventId === eventId);
       if (idx >= 0) {
@@ -127,7 +265,6 @@ export default function HomePage() {
 
   const removeFromSlip = (id: number) => setBetSlip(prev => prev.filter(b => b.eventId !== id));
   const updateAmount   = (id: number, v: string) => setBetSlip(prev => prev.map(b => b.eventId === id ? { ...b, amount: v } : b));
-
   const totalStake     = betSlip.reduce((s, b) => s + (parseFloat(b.amount) || 0), 0);
   const totalPotential = betSlip.reduce((s, b) => s + (parseFloat(b.amount) || 0) * b.odds, 0);
 
@@ -151,36 +288,199 @@ export default function HomePage() {
     setPlacingBet(false);
   };
 
-  const LIVE_STATUS = new Set(["1H", "2H", "HT", "ET", "P", "BT", "INT", "LIVE"]);
-  const isLiveMatch  = (ev: Event) => LIVE_STATUS.has(ev.statusShort ?? "NS");
-  const isFinished   = (ev: Event) => ["FT", "AET", "PEN", "AWD", "WO"].includes(ev.statusShort ?? "");
+  // ── Match card renderer ───────────────────────────────────────────────────
+  const renderMatchCard = (event: Event, idx: number, total: number) => {
+    const inSlip  = betSlip.find(b => b.eventId === event.id);
+    const isOpen  = expandedMarkets.has(event.id);
+    const markets = buildMarkets(event);
+    const totalExtra = markets.reduce((n, m) => n + m.selections.length, 0);
+    const isLast  = idx === total - 1;
 
-  // Filter events by odds filter + active tab
-  const filteredEvents = (events ?? []).filter(ev => {
-    if (activeTab === "live"    && !isLiveMatch(ev))  return false;
-    if (activeTab === "sports"  && isFinished(ev))     return false;
-    if (activeOddFilter !== null) {
-      return ev.oddsHome <= activeOddFilter || ev.oddsDraw <= activeOddFilter || ev.oddsAway <= activeOddFilter;
-    }
-    return true;
-  });
+    return (
+      <div
+        key={event.id}
+        className="overflow-hidden"
+        style={{
+          background: inSlip ? "#0f2a1a" : "#111827",
+          borderLeft: inSlip ? `3px solid ${GREEN}` : "3px solid transparent",
+          borderBottom: !isLast ? "1px solid rgba(255,255,255,0.04)" : undefined,
+          borderRadius: isLast ? "0 0 12px 12px" : undefined,
+        }}
+      >
+        {/* Match info row */}
+        <div className="px-3 pt-2.5 pb-1 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            {isLiveMatch(event) ? (
+              <span className="flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded-full text-white" style={{ background: "#DC2626" }}>
+                <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
+                {event.statusShort === "HT" ? "HT" : event.statusShort === "ET" ? "ET" : "LIVE"}
+                {event.elapsed != null && event.statusShort !== "HT" && (
+                  <span className="ml-0.5">{event.elapsed}&apos;</span>
+                )}
+              </span>
+            ) : isFinished(event) ? (
+              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full text-white/70" style={{ background: "rgba(255,255,255,0.1)" }}>
+                {event.statusShort === "AET" ? "AET" : event.statusShort === "PEN" ? "PEN" : "FT"}
+              </span>
+            ) : (
+              <span className="text-[9px] font-bold text-white/30 uppercase tracking-wide">
+                {event.startsAt
+                  ? new Date(event.startsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                  : "Today"}
+              </span>
+            )}
+          </div>
+          <span className="text-[9px] text-white/20 truncate max-w-[120px]">{event.league}</span>
+        </div>
 
-  // Sort: live first, then by kick-off time
-  const sortedEvents = [...filteredEvents].sort((a, b) => {
-    const aLive = isLiveMatch(a) ? 0 : 1;
-    const bLive = isLiveMatch(b) ? 0 : 1;
-    if (aLive !== bLive) return aLive - bLive;
-    return new Date(a.startsAt ?? 0).getTime() - new Date(b.startsAt ?? 0).getTime();
-  });
+        {/* Teams + score */}
+        <div className="px-3 pb-2">
+          <div className="flex items-center justify-between mb-2 gap-2">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              {event.logoHome && (
+                <img src={event.logoHome} alt={event.teamHome}
+                  className="w-5 h-5 object-contain shrink-0"
+                  onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              )}
+              <span className="text-sm font-black text-white truncate">{event.teamHome}</span>
+            </div>
 
-  // Group by league
-  const grouped: Record<string, Event[]> = {};
-  sortedEvents.forEach(ev => {
-    if (!grouped[ev.league]) grouped[ev.league] = [];
-    grouped[ev.league]!.push(ev);
-  });
+            {(isLiveMatch(event) || isFinished(event)) && event.scoreHome != null && event.scoreAway != null ? (
+              <div className="flex items-center gap-1 shrink-0 px-2 py-0.5 rounded-lg"
+                style={{ background: isLiveMatch(event) ? "rgba(220,38,38,0.15)" : "rgba(255,255,255,0.06)" }}>
+                <span className="text-sm font-black" style={{ color: isLiveMatch(event) ? "#ef4444" : "white" }}>{event.scoreHome}</span>
+                <span className="text-[10px] text-white/30 font-black">-</span>
+                <span className="text-sm font-black" style={{ color: isLiveMatch(event) ? "#ef4444" : "white" }}>{event.scoreAway}</span>
+              </div>
+            ) : (
+              <span className="text-[10px] font-black text-white/30 mx-1 shrink-0">VS</span>
+            )}
 
-  const liveCount = (events ?? []).filter(isLiveMatch).length;
+            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
+              <span className="text-sm font-black text-white truncate">{event.teamAway}</span>
+              {event.logoAway && (
+                <img src={event.logoAway} alt={event.teamAway}
+                  className="w-5 h-5 object-contain shrink-0"
+                  onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              )}
+            </div>
+          </div>
+
+          {/* 1X2 odds */}
+          <div className="grid grid-cols-3 gap-1.5">
+            {([
+              { choice: "home", code: "1", label: t("home"), odds: event.oddsHome },
+              { choice: "draw", code: "X", label: t("draw"), odds: event.oddsDraw },
+              { choice: "away", code: "2", label: t("away"), odds: event.oddsAway },
+            ] as const).map(opt => {
+              const selected = inSlip?.choice === opt.choice;
+              return (
+                <button
+                  key={opt.choice}
+                  onClick={() => addToBetSlip(event.id, event.teamHome, event.teamAway, opt.choice, `1X2: ${opt.label}`, opt.odds)}
+                  className="rounded-lg py-2.5 px-1 text-center transition-all active:scale-95 relative overflow-hidden"
+                  style={{
+                    background: selected ? GREEN : "rgba(255,255,255,0.06)",
+                    border: selected ? `1px solid ${GREEN}` : "1px solid rgba(255,255,255,0.08)",
+                  }}
+                >
+                  <div className="text-[9px] font-bold mb-0.5" style={{ color: selected ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.4)" }}>
+                    {opt.code} · {opt.label}
+                  </div>
+                  <div className="text-sm font-black leading-none" style={{ color: selected ? "#fff" : GOLD }}>
+                    {opt.odds.toFixed(2)}
+                  </div>
+                  {selected && <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-white/50" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Expanded markets */}
+        {isOpen && (
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+            {markets.map(market => (
+              <div key={market.id} className="px-3 py-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                <div className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">{market.label}</div>
+                <div className={`grid gap-1.5 ${market.selections.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+                  {market.selections.map(sel => {
+                    const selected = inSlip?.choice === sel.choice;
+                    return (
+                      <button
+                        key={sel.choice}
+                        onClick={() => addToBetSlip(event.id, event.teamHome, event.teamAway, sel.choice, `${market.label}: ${sel.label}`, sel.odds)}
+                        className="rounded-lg py-2 px-1 text-center transition-all active:scale-95"
+                        style={{
+                          background: selected ? GREEN : "rgba(255,255,255,0.05)",
+                          border: `1px solid ${selected ? GREEN : "rgba(255,255,255,0.07)"}`,
+                        }}
+                      >
+                        <div className="text-[9px] font-semibold mb-0.5 truncate" style={{ color: selected ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.45)" }}>
+                          {sel.label}
+                        </div>
+                        <div className="text-sm font-black" style={{ color: selected ? "#fff" : GOLD }}>
+                          {sel.odds.toFixed(2)}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* More markets toggle */}
+        <button
+          onClick={() => toggleMarkets(event.id)}
+          className="w-full flex items-center justify-center gap-1.5 py-1.5 transition-colors"
+          style={{
+            background: isOpen ? "rgba(253,208,23,0.06)" : "rgba(255,255,255,0.02)",
+            borderTop: "1px solid rgba(255,255,255,0.04)",
+          }}
+        >
+          <span className="text-[10px] font-bold" style={{ color: GOLD }}>
+            {isOpen ? "Hide markets" : `+${totalExtra} more markets`}
+          </span>
+          <svg className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+            width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2.5">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+      </div>
+    );
+  };
+
+  // ── Render a grouped event list ───────────────────────────────────────────
+  const renderGrouped = (grouped: Record<string, Event[]>) => (
+    <div className="space-y-4">
+      {Object.entries(grouped).map(([league, evs]) => (
+        <div key={league}>
+          <LeagueHeader league={league} count={evs.length}
+            logoUrl={evs[0]?.leagueLogo ?? undefined}
+            country={evs[0]?.country ?? undefined}
+          />
+          <div className="space-y-0.5">
+            {evs.map((ev, i) => renderMatchCard(ev, i, evs.length))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // ── Section header (LIVE NOW / UPCOMING) ─────────────────────────────────
+  const SectionHeader = ({ icon, title, count, color }: { icon: string; title: string; count: number; color: string }) => (
+    <div className="flex items-center gap-2 px-1 mb-3">
+      <span className="text-sm">{icon}</span>
+      <span className="text-xs font-black uppercase tracking-widest" style={{ color }}>{title}</span>
+      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white/50"
+        style={{ background: "rgba(255,255,255,0.07)" }}>
+        {count}
+      </span>
+      <div className="flex-1 h-px" style={{ background: `${color}20` }} />
+    </div>
+  );
 
   return (
     <div style={{ background: NAVY2, minHeight: "100vh" }} className="pb-20">
@@ -213,7 +513,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ── SPORTS CATEGORY ROW ── */}
+      {/* ── SPORT CATEGORY ROW ── */}
       <div className="overflow-x-auto scrollbar-none" style={{ background: "#0c1a30" }}>
         <div className="flex items-center gap-1 px-3 py-2" style={{ minWidth: "max-content" }}>
           {SPORT_CATS.map(sport => (
@@ -227,10 +527,8 @@ export default function HomePage() {
               }}
             >
               <span className="text-xl leading-none">{sport.icon}</span>
-              <span
-                className="text-[9px] font-bold whitespace-nowrap"
-                style={{ color: activeSport === sport.id ? GOLD : "rgba(255,255,255,0.5)" }}
-              >
+              <span className="text-[9px] font-bold whitespace-nowrap"
+                style={{ color: activeSport === sport.id ? GOLD : "rgba(255,255,255,0.5)" }}>
                 {sport.label}
               </span>
             </button>
@@ -247,7 +545,6 @@ export default function HomePage() {
           minHeight: "76px",
         }}
       >
-        {/* Left content */}
         <div>
           <div className="flex items-center gap-1.5 mb-1">
             <span className="text-xs font-black text-white/70 uppercase tracking-widest">Aviator</span>
@@ -256,24 +553,16 @@ export default function HomePage() {
           <div className="text-2xl font-black text-white leading-tight">Win Up To</div>
           <div className="text-3xl font-black leading-tight" style={{ color: GOLD }}>TZS 5,000,000</div>
         </div>
-        {/* Right: big multiplier visual */}
         <div className="text-right">
           <div className="text-5xl font-black" style={{ color: GOLD, textShadow: "0 0 30px #FDD01780" }}>×100</div>
-          <button
-            className="mt-1 px-4 py-1.5 rounded-full text-xs font-black text-black"
-            style={{ background: GOLD }}
-          >
+          <button className="mt-1 px-4 py-1.5 rounded-full text-xs font-black text-black" style={{ background: GOLD }}>
             Play Now
           </button>
         </div>
-        {/* Decorative plane */}
-        <div
-          className="absolute right-28 top-2 text-2xl opacity-20 rotate-12"
-          style={{ fontSize: "36px" }}
-        >✈️</div>
+        <div className="absolute right-28 top-2 text-2xl opacity-20 rotate-12" style={{ fontSize: "36px" }}>✈️</div>
       </div>
 
-      {/* ── ODDS FILTER BUTTONS ── */}
+      {/* ── ODDS FILTER ── */}
       <div className="px-3 mb-3 flex items-center gap-2">
         <span className="text-[10px] font-semibold text-white/40 uppercase tracking-wider shrink-0">Filter:</span>
         <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
@@ -292,11 +581,9 @@ export default function HomePage() {
             </button>
           ))}
           {activeOddFilter !== null && (
-            <button
-              onClick={() => setActiveOddFilter(null)}
+            <button onClick={() => setActiveOddFilter(null)}
               className="text-[10px] font-bold px-2 py-1 rounded-full"
-              style={{ color: "rgba(255,255,255,0.3)", border: "1px solid rgba(255,255,255,0.08)" }}
-            >
+              style={{ color: "rgba(255,255,255,0.3)", border: "1px solid rgba(255,255,255,0.08)" }}>
               ✕ Clear
             </button>
           )}
@@ -305,231 +592,61 @@ export default function HomePage() {
 
       {/* ── MAIN CONTENT ── */}
       <div className="flex gap-4 px-3">
-        {/* Events column */}
         <div className="flex-1 min-w-0">
           {isLoading ? (
             <div className="space-y-2">
-              {[1,2,3].map(i => (
+              {[1, 2, 3].map(i => (
                 <div key={i} className="h-36 rounded-xl animate-pulse" style={{ background: "#111827" }} />
               ))}
             </div>
-          ) : filteredEvents.length === 0 ? (
-            <div className="text-center py-20 text-white/30">{t("no_events")}</div>
           ) : (
-            <div className="space-y-0.5">
-              {Object.entries(grouped).map(([league, leagueEvents]) => (
-                <div key={league} className="mb-4">
-                  {/* League header */}
-                  <div
-                    className="flex items-center gap-2 px-3 py-2 rounded-t-xl"
-                    style={{ background: "#0c1a30", borderLeft: `3px solid ${GREEN}` }}
-                  >
-                    {leagueEvents[0]?.leagueLogo ? (
-                      <img
-                        src={leagueEvents[0].leagueLogo}
-                        alt={league}
-                        className="w-4 h-4 object-contain shrink-0"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                      />
-                    ) : (
-                      <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ background: GREEN }}>
-                        <span className="text-[8px] text-white font-black">⚽</span>
-                      </div>
+
+            /* ── LIVE TAB: only live matches ── */
+            activeTab === "live" ? (
+              liveEvents.length === 0 ? (
+                <div className="text-center py-20 text-white/30">No live matches right now</div>
+              ) : (
+                <>
+                  <SectionHeader icon="🔴" title={`Live Now`} count={liveEvents.length} color="#ef4444" />
+                  {renderGrouped(liveGrouped)}
+                  <Pagination current={livePage} total={totalLivePages} onChange={p => { setLivePage(p); window.scrollTo(0, 0); }} />
+                </>
+              )
+
+            /* ── SPORTS TAB: live + upcoming separated ── */
+            ) : activeTab === "sports" ? (
+              <>
+                {/* LIVE section */}
+                {liveEvents.length > 0 && (
+                  <div className="mb-6">
+                    <SectionHeader icon="🔴" title="Live Now" count={liveEvents.length} color="#ef4444" />
+                    {renderGrouped(liveGrouped)}
+                    {totalLivePages > 1 && (
+                      <Pagination current={livePage} total={totalLivePages}
+                        onChange={p => { setLivePage(p); window.scrollTo(0, 0); }} />
                     )}
-                    <div>
-                      <span className="text-[11px] font-black text-white/70 uppercase tracking-widest">{league}</span>
-                      {leagueEvents[0]?.country && (
-                        <span className="text-[9px] text-white/30 ml-1.5">{leagueEvents[0].country}</span>
-                      )}
-                    </div>
-                    <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full text-white/40" style={{ background: "rgba(255,255,255,0.05)" }}>
-                      {leagueEvents.length} match{leagueEvents.length > 1 ? "es" : ""}
-                    </span>
                   </div>
+                )}
 
-                  {/* Match cards */}
-                  <div className="space-y-0.5">
-                    {leagueEvents.map((event, idx) => {
-                      const inSlip  = betSlip.find(b => b.eventId === event.id);
-                      const isOpen  = expandedMarkets.has(event.id);
-                      const markets = buildMarkets(event);
-                      const totalExtra = markets.reduce((n, m) => n + m.selections.length, 0);
+                {/* UPCOMING section */}
+                {upcomingEvents.length === 0 ? (
+                  liveEvents.length === 0 && (
+                    <div className="text-center py-20 text-white/30">{t("no_events")}</div>
+                  )
+                ) : (
+                  <>
+                    <SectionHeader icon="🗓" title="Upcoming Matches" count={upcomingEvents.length} color={GOLD} />
+                    {renderGrouped(upcomingGrouped)}
+                    <Pagination current={upcomingPage} total={totalUpcomingPages}
+                      onChange={p => { setUpcomingPage(p); window.scrollTo(0, 0); }} />
+                  </>
+                )}
+              </>
 
-                      return (
-                        <div
-                          key={event.id}
-                          className="overflow-hidden"
-                          style={{
-                            background: inSlip ? "#0f2a1a" : "#111827",
-                            borderLeft: inSlip ? `3px solid ${GREEN}` : "3px solid transparent",
-                            borderBottom: idx < leagueEvents.length - 1 ? "1px solid rgba(255,255,255,0.04)" : undefined,
-                            borderRadius: idx === leagueEvents.length - 1 ? "0 0 12px 12px" : undefined,
-                          }}
-                        >
-                          {/* Match info row */}
-                          <div className="px-3 pt-2.5 pb-1 flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
-                              {/* Status badge */}
-                              {isLiveMatch(event) ? (
-                                <span className="flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded-full text-white" style={{ background: "#DC2626" }}>
-                                  <span className="w-1 h-1 rounded-full bg-white animate-pulse" />
-                                  {event.statusShort === "HT" ? "HT" : event.statusShort === "ET" ? "ET" : "LIVE"}
-                                  {event.elapsed != null && event.statusShort !== "HT" && (
-                                    <span className="ml-0.5">{event.elapsed}&apos;</span>
-                                  )}
-                                </span>
-                              ) : isFinished(event) ? (
-                                <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full text-white/70" style={{ background: "rgba(255,255,255,0.1)" }}>
-                                  {event.statusShort === "AET" ? "AET" : event.statusShort === "PEN" ? "PEN" : "FT"}
-                                </span>
-                              ) : (
-                                <span className="text-[9px] font-bold text-white/30 uppercase tracking-wide">
-                                  {event.startsAt
-                                    ? new Date(event.startsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                                    : "Today"}
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[9px] text-white/20 truncate max-w-[120px]">{event.league}</span>
-                          </div>
-
-                          {/* Teams + odds */}
-                          <div className="px-3 pb-2">
-                            {/* Team names + logos + live score */}
-                            <div className="flex items-center justify-between mb-2 gap-2">
-                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                {event.logoHome && (
-                                  <img
-                                    src={event.logoHome}
-                                    alt={event.teamHome}
-                                    className="w-5 h-5 object-contain shrink-0"
-                                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                                  />
-                                )}
-                                <span className="text-sm font-black text-white truncate">{event.teamHome}</span>
-                              </div>
-
-                              {/* Live score OR vs */}
-                              {(isLiveMatch(event) || isFinished(event)) && event.scoreHome != null && event.scoreAway != null ? (
-                                <div className="flex items-center gap-1 shrink-0 px-2 py-0.5 rounded-lg" style={{ background: isLiveMatch(event) ? "rgba(220,38,38,0.15)" : "rgba(255,255,255,0.06)" }}>
-                                  <span className="text-sm font-black" style={{ color: isLiveMatch(event) ? "#ef4444" : "white" }}>{event.scoreHome}</span>
-                                  <span className="text-[10px] text-white/30 font-black">-</span>
-                                  <span className="text-sm font-black" style={{ color: isLiveMatch(event) ? "#ef4444" : "white" }}>{event.scoreAway}</span>
-                                </div>
-                              ) : (
-                                <span className="text-[10px] font-black text-white/30 mx-1 shrink-0">VS</span>
-                              )}
-
-                              <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
-                                <span className="text-sm font-black text-white truncate">{event.teamAway}</span>
-                                {event.logoAway && (
-                                  <img
-                                    src={event.logoAway}
-                                    alt={event.teamAway}
-                                    className="w-5 h-5 object-contain shrink-0"
-                                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                                  />
-                                )}
-                              </div>
-                            </div>
-
-                            {/* 1X2 odds buttons */}
-                            <div className="grid grid-cols-3 gap-1.5">
-                              {([
-                                { choice: "home", code: "1", label: t("home"), odds: event.oddsHome },
-                                { choice: "draw", code: "X", label: t("draw"), odds: event.oddsDraw },
-                                { choice: "away", code: "2", label: t("away"), odds: event.oddsAway },
-                              ] as const).map(opt => {
-                                const selected = inSlip?.choice === opt.choice;
-                                return (
-                                  <button
-                                    key={opt.choice}
-                                    onClick={() => addToBetSlip(event.id, event.teamHome, event.teamAway, opt.choice, `1X2: ${opt.label}`, opt.odds)}
-                                    className="rounded-lg py-2.5 px-1 text-center transition-all active:scale-95 relative overflow-hidden"
-                                    style={{
-                                      background: selected
-                                        ? GREEN
-                                        : "rgba(255,255,255,0.06)",
-                                      border: selected
-                                        ? `1px solid ${GREEN}`
-                                        : "1px solid rgba(255,255,255,0.08)",
-                                    }}
-                                  >
-                                    <div className="text-[9px] font-bold mb-0.5" style={{ color: selected ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.4)" }}>
-                                      {opt.code} · {opt.label}
-                                    </div>
-                                    <div className="text-sm font-black leading-none" style={{ color: selected ? "#fff" : GOLD }}>
-                                      {opt.odds.toFixed(2)}
-                                    </div>
-                                    {selected && (
-                                      <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-white/50" />
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-
-                          {/* Expanded extra markets */}
-                          {isOpen && (
-                            <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                              {markets.map(market => (
-                                <div key={market.id} className="px-3 py-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                                  <div className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">{market.label}</div>
-                                  <div className={`grid gap-1.5 ${market.selections.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
-                                    {market.selections.map(sel => {
-                                      const selected = inSlip?.choice === sel.choice;
-                                      return (
-                                        <button
-                                          key={sel.choice}
-                                          onClick={() => addToBetSlip(event.id, event.teamHome, event.teamAway, sel.choice, `${market.label}: ${sel.label}`, sel.odds)}
-                                          className="rounded-lg py-2 px-1 text-center transition-all active:scale-95"
-                                          style={{
-                                            background: selected ? GREEN : "rgba(255,255,255,0.05)",
-                                            border: `1px solid ${selected ? GREEN : "rgba(255,255,255,0.07)"}`,
-                                          }}
-                                        >
-                                          <div className="text-[9px] font-semibold mb-0.5 truncate" style={{ color: selected ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.45)" }}>
-                                            {sel.label}
-                                          </div>
-                                          <div className="text-sm font-black" style={{ color: selected ? "#fff" : GOLD }}>
-                                            {sel.odds.toFixed(2)}
-                                          </div>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Footer row: more markets toggle */}
-                          <button
-                            onClick={() => toggleMarkets(event.id)}
-                            className="w-full flex items-center justify-center gap-1.5 py-1.5 transition-colors"
-                            style={{
-                              background: isOpen ? "rgba(253,208,23,0.06)" : "rgba(255,255,255,0.02)",
-                              borderTop: "1px solid rgba(255,255,255,0.04)",
-                            }}
-                          >
-                            <span className="text-[10px] font-bold" style={{ color: GOLD }}>
-                              {isOpen ? "Hide markets" : `+${totalExtra} more markets`}
-                            </span>
-                            <svg
-                              className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-                              width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2.5"
-                            >
-                              <path d="m6 9 6 6 6-6" />
-                            </svg>
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
+            /* ── OTHER TABS: placeholder ── */
+            ) : (
+              <div className="text-center py-20 text-white/30">Coming soon</div>
+            )
           )}
         </div>
 
@@ -557,12 +674,7 @@ export default function HomePage() {
             <rect x="9" y="3" width="6" height="4" rx="1"/>
             <path d="M9 12h6M9 16h4"/>
           </svg>
-          <span
-            className="text-[10px] font-black leading-none mt-0.5"
-            style={{ color: GOLD }}
-          >
-            {betSlip.length}
-          </span>
+          <span className="text-[10px] font-black leading-none mt-0.5" style={{ color: GOLD }}>{betSlip.length}</span>
         </button>
       )}
 
@@ -574,8 +686,8 @@ export default function HomePage() {
             className="lg:hidden fixed left-0 right-0 z-50 rounded-t-2xl overflow-hidden flex flex-col"
             style={{ bottom: "56px", maxHeight: "80vh", background: "#0f1e35", border: "1px solid rgba(255,255,255,0.08)" }}
           >
-            {/* Handle bar */}
-            <div className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <div className="flex items-center justify-between px-4 pt-3 pb-2 shrink-0"
+              style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-black text-white">{t("bet_slip")}</span>
                 <span className="text-[10px] font-black px-2 py-0.5 rounded-full text-black" style={{ background: GOLD }}>{betSlip.length}</span>
@@ -585,8 +697,7 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* Selections */}
-            <div className="flex-1 overflow-y-auto divide-y" style={{ divideColor: "rgba(255,255,255,0.04)" }}>
+            <div className="flex-1 overflow-y-auto divide-y" style={{ borderColor: "rgba(255,255,255,0.04)" }}>
               {betSlip.map(bet => (
                 <div key={bet.eventId} className="px-4 py-3">
                   <div className="flex items-start justify-between gap-2 mb-2">
@@ -594,7 +705,9 @@ export default function HomePage() {
                       <div className="text-xs font-bold text-white truncate">{bet.teamHome} v {bet.teamAway}</div>
                       <div className="text-[11px] font-semibold mt-0.5" style={{ color: GOLD }}>{bet.label} @ {bet.odds.toFixed(2)}</div>
                     </div>
-                    <button onClick={() => removeFromSlip(bet.eventId)} className="w-6 h-6 flex items-center justify-center rounded-full text-xs text-white/40 hover:text-white shrink-0" style={{ background: "rgba(255,255,255,0.06)" }}>✕</button>
+                    <button onClick={() => removeFromSlip(bet.eventId)}
+                      className="w-6 h-6 flex items-center justify-center rounded-full text-xs text-white/40 hover:text-white shrink-0"
+                      style={{ background: "rgba(255,255,255,0.06)" }}>✕</button>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-white/40 shrink-0">TZS</span>
@@ -613,7 +726,6 @@ export default function HomePage() {
               ))}
             </div>
 
-            {/* Totals + place */}
             <div className="px-4 py-3 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "#0a1525" }}>
               <div className="flex justify-between text-xs mb-1">
                 <span className="text-white/40">Total Stake</span>
@@ -641,7 +753,7 @@ export default function HomePage() {
   );
 }
 
-// ─── Desktop Bet Slip ──────────────────────────────────────────
+// ─── Desktop Bet Slip component ───────────────────────────────────────────────
 function DesktopBetSlip({ betSlip, totalStake, totalPotential, placingBet, successMsg, errorMsg,
   user, t, removeFromSlip, updateAmount, handlePlaceAll, navigate }: {
   betSlip: BetItem[]; totalStake: number; totalPotential: number;
@@ -652,8 +764,8 @@ function DesktopBetSlip({ betSlip, totalStake, totalPotential, placingBet, succe
 }) {
   return (
     <div className="sticky top-24 rounded-xl overflow-hidden" style={{ background: "#0f1e35", border: "1px solid rgba(255,255,255,0.08)" }}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3" style={{ background: "#0a1525", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="flex items-center justify-between px-4 py-3"
+        style={{ background: "#0a1525", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
         <span className="font-black text-white text-sm">{t("bet_slip")}</span>
         {betSlip.length > 0 && (
           <span className="text-[10px] font-black px-2 py-0.5 rounded-full text-black" style={{ background: GOLD }}>{betSlip.length}</span>
@@ -681,38 +793,41 @@ function DesktopBetSlip({ betSlip, totalStake, totalPotential, placingBet, succe
                 <div className="flex gap-1.5 items-center">
                   <span className="text-[10px] text-white/30">TZS</span>
                   <input
-                    type="number" value={bet.amount} onChange={e => updateAmount(bet.eventId, e.target.value)}
-                    className="flex-1 rounded-lg px-2 py-1.5 text-xs text-white w-0 outline-none"
+                    type="number" value={bet.amount}
+                    onChange={e => updateAmount(bet.eventId, e.target.value)}
+                    className="flex-1 rounded-lg px-3 py-1.5 text-sm text-white font-bold outline-none"
                     style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
                     min="100"
                   />
                 </div>
                 <div className="text-[10px] mt-1 text-white/30">
-                  Win: <span className="font-black" style={{ color: GOLD }}>TZS {((parseFloat(bet.amount) || 0) * bet.odds).toLocaleString()}</span>
+                  Potential: <span className="font-black" style={{ color: GOLD }}>TZS {((parseFloat(bet.amount) || 0) * bet.odds).toLocaleString()}</span>
                 </div>
               </div>
             ))}
           </div>
-          <div className="px-4 py-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-            <div className="flex justify-between text-[11px] mb-1">
+
+          <div className="px-4 py-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "#0a1525" }}>
+            <div className="flex justify-between text-xs mb-1">
               <span className="text-white/40">Total Stake</span>
               <span className="font-bold text-white">TZS {totalStake.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between text-[11px] mb-3">
+            <div className="flex justify-between text-xs mb-3">
               <span className="text-white/40">Potential Win</span>
               <span className="font-black" style={{ color: GOLD }}>TZS {totalPotential.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
             </div>
-            {successMsg && <div className="text-xs text-green-400 bg-green-400/10 rounded-lg px-2 py-1.5 mb-2">{successMsg}</div>}
-            {errorMsg && <div className="text-xs text-red-400 bg-red-400/10 rounded-lg px-2 py-1.5 mb-2">{errorMsg}</div>}
+            {errorMsg   && <div className="text-xs text-red-400   bg-red-400/10   rounded-lg px-3 py-2 mb-2">{errorMsg}</div>}
+            {successMsg && <div className="text-xs text-green-400 bg-green-400/10 rounded-lg px-3 py-2 mb-2">{successMsg}</div>}
             <button
               onClick={handlePlaceAll} disabled={placingBet}
-              className="w-full py-2.5 rounded-xl text-sm font-black text-black disabled:opacity-50"
+              className="w-full py-3 rounded-xl text-sm font-black text-black disabled:opacity-50"
               style={{ background: GOLD }}
             >
-              {placingBet ? "Placing..." : t("place_bet")}
+              {placingBet ? "Placing..." : `${t("place_bet")} · ${betSlip.length}`}
             </button>
             {!user && (
-              <button onClick={() => navigate("/login")} className="w-full text-xs text-center mt-2 text-white/30 hover:text-white/60">
+              <button onClick={() => navigate("/login")}
+                className="w-full mt-2 py-2.5 rounded-xl text-xs font-bold text-white/60 border border-white/10">
                 Login to place bets
               </button>
             )}
