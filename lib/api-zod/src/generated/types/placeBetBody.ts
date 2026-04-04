@@ -5,10 +5,10 @@
  * BetTZ Tanzania Betting Platform API
  * OpenAPI spec version: 0.1.0
  */
-import type { PlaceBetBodyChoice } from "./placeBetBodyChoice";
 
 export interface PlaceBetBody {
   eventId: number;
-  choice: PlaceBetBodyChoice;
+  /** Market choice key, e.g. home, draw, away, dc_1x, ou_o25, btts_yes, cs_10, ht_h, htft_1x, wtn_h, btr_b1, ah_h-0.5 */
+  choice: string;
   amount: number;
 }

@@ -5,7 +5,6 @@
  * BetTZ Tanzania Betting Platform API
  * OpenAPI spec version: 0.1.0
  */
-import type { BetChoice } from "./betChoice";
 import type { BetStatus } from "./betStatus";
 import type { Event } from "./event";
 
@@ -13,7 +12,8 @@ export interface Bet {
   id: number;
   userId: number;
   eventId: number;
-  choice: BetChoice;
+  /** Market choice key */
+  choice: string;
   amount: number;
   potentialWin: number;
   status: BetStatus;

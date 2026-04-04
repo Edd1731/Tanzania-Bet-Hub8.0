@@ -87,50 +87,12 @@ export interface CreateEventBody {
   startsAt?: string;
 }
 
-export type PlaceBetBodyChoice =
-  (typeof PlaceBetBodyChoice)[keyof typeof PlaceBetBodyChoice];
-
-export const PlaceBetBodyChoice = {
-  home: "home",
-  draw: "draw",
-  away: "away",
-  dc_1x: "dc_1x",
-  dc_x2: "dc_x2",
-  dc_12: "dc_12",
-  ou_o15: "ou_o15",
-  ou_u15: "ou_u15",
-  ou_o25: "ou_o25",
-  ou_u25: "ou_u25",
-  ou_o35: "ou_o35",
-  ou_u35: "ou_u35",
-  btts_yes: "btts_yes",
-  btts_no: "btts_no",
-} as const;
-
 export interface PlaceBetBody {
   eventId: number;
-  choice: PlaceBetBodyChoice;
+  /** Market choice key, e.g. home, draw, away, dc_1x, ou_o25, btts_yes, cs_10, ht_h, htft_1x, wtn_h, btr_b1, ah_h-0.5 */
+  choice: string;
   amount: number;
 }
-
-export type BetChoice = (typeof BetChoice)[keyof typeof BetChoice];
-
-export const BetChoice = {
-  home: "home",
-  draw: "draw",
-  away: "away",
-  dc_1x: "dc_1x",
-  dc_x2: "dc_x2",
-  dc_12: "dc_12",
-  ou_o15: "ou_o15",
-  ou_u15: "ou_u15",
-  ou_o25: "ou_o25",
-  ou_u25: "ou_u25",
-  ou_o35: "ou_o35",
-  ou_u35: "ou_u35",
-  btts_yes: "btts_yes",
-  btts_no: "btts_no",
-} as const;
 
 export type BetStatus = (typeof BetStatus)[keyof typeof BetStatus];
 
@@ -144,7 +106,8 @@ export interface Bet {
   id: number;
   userId: number;
   eventId: number;
-  choice: BetChoice;
+  /** Market choice key */
+  choice: string;
   amount: number;
   potentialWin: number;
   status: BetStatus;
