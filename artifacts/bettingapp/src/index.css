@@ -66,58 +66,66 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* Tanzania-themed dark color palette */
+/* Tanzania flag palette:
+   Green  #1B8A3C  hsl(140 68% 32%)
+   Black  #111111  hsl(0 0% 7%)
+   Gold   #FDD017  hsl(48 98% 54%)
+   Blue   #1565C0  hsl(214 78% 42%)
+*/
+
 :root {
   --button-outline: rgba(0,0,0, .15);
   --badge-outline: rgba(0,0,0, .08);
   --opaque-button-border-intensity: -8;
-  --elevate-1: rgba(0,0,0, .04);
-  --elevate-2: rgba(0,0,0, .10);
+  --elevate-1: rgba(0,0,0, .05);
+  --elevate-2: rgba(0,0,0, .12);
 
-  /* Deep forest green inspired by Tanzania flag */
-  --background: 156 30% 6%;
-  --foreground: 45 80% 92%;
-  --border: 156 20% 18%;
-  --card: 156 25% 10%;
-  --card-foreground: 45 80% 92%;
-  --card-border: 156 20% 20%;
+  /* Deep black-green base — Tanzania flag black + green */
+  --background: 140 22% 5%;
+  --foreground: 48 60% 90%;
+  --border: 140 18% 16%;
+  --card: 140 20% 8%;
+  --card-foreground: 48 60% 90%;
+  --card-border: 140 18% 18%;
 
-  --sidebar: 156 30% 8%;
-  --sidebar-foreground: 45 70% 85%;
-  --sidebar-border: 156 20% 15%;
-  --sidebar-primary: 45 95% 50%;
+  --sidebar: 140 25% 7%;
+  --sidebar-foreground: 48 50% 82%;
+  --sidebar-border: 140 18% 14%;
+  --sidebar-primary: 48 98% 54%;
   --sidebar-primary-foreground: 0 0% 5%;
-  --sidebar-accent: 156 50% 30%;
-  --sidebar-accent-foreground: 45 80% 92%;
-  --sidebar-ring: 45 95% 50%;
+  --sidebar-accent: 140 55% 22%;
+  --sidebar-accent-foreground: 48 60% 90%;
+  --sidebar-ring: 48 98% 54%;
 
-  --popover: 156 30% 8%;
-  --popover-foreground: 45 80% 92%;
-  --popover-border: 156 20% 18%;
+  --popover: 140 22% 7%;
+  --popover-foreground: 48 60% 90%;
+  --popover-border: 140 18% 16%;
 
-  /* Gold as primary - Tanzania flag gold */
-  --primary: 45 95% 50%;
+  /* Gold primary — Tanzania flag gold */
+  --primary: 48 98% 54%;
   --primary-foreground: 0 0% 5%;
 
-  --secondary: 156 40% 18%;
-  --secondary-foreground: 45 70% 85%;
+  /* Blue secondary — Tanzania flag blue */
+  --secondary: 214 65% 30%;
+  --secondary-foreground: 48 60% 90%;
 
-  --muted: 156 20% 12%;
-  --muted-foreground: 45 30% 55%;
+  --muted: 140 15% 10%;
+  --muted-foreground: 48 20% 48%;
 
-  --accent: 156 50% 28%;
-  --accent-foreground: 45 80% 92%;
+  /* Tanzania green accent */
+  --accent: 140 55% 20%;
+  --accent-foreground: 48 60% 90%;
 
   --destructive: 0 72% 50%;
   --destructive-foreground: 0 0% 98%;
 
-  --input: 156 20% 20%;
-  --ring: 45 95% 50%;
+  --input: 140 18% 18%;
+  --ring: 48 98% 54%;
 
-  --chart-1: 45 95% 50%;
-  --chart-2: 156 60% 40%;
-  --chart-3: 25 90% 55%;
-  --chart-4: 200 70% 50%;
+  --chart-1: 48 98% 54%;
+  --chart-2: 140 60% 40%;
+  --chart-3: 214 78% 55%;
+  --chart-4: 25 90% 55%;
   --chart-5: 280 60% 55%;
 
   --app-font-sans: 'Inter', sans-serif;
@@ -125,14 +133,14 @@
   --app-font-mono: Menlo, monospace;
   --radius: 0.5rem;
 
-  --shadow-2xs: 0px 2px 4px 0px rgba(0,0,0,0.4);
-  --shadow-xs: 0px 2px 4px 0px rgba(0,0,0,0.4);
-  --shadow-sm: 0px 2px 4px 0px rgba(0,0,0,0.4), 0px 1px 2px -1px rgba(0,0,0,0.4);
-  --shadow: 0px 4px 8px 0px rgba(0,0,0,0.5), 0px 1px 2px -1px rgba(0,0,0,0.4);
-  --shadow-md: 0px 6px 12px 0px rgba(0,0,0,0.5), 0px 2px 4px -1px rgba(0,0,0,0.4);
-  --shadow-lg: 0px 10px 20px 0px rgba(0,0,0,0.6), 0px 4px 6px -1px rgba(0,0,0,0.4);
-  --shadow-xl: 0px 16px 32px 0px rgba(0,0,0,0.6), 0px 8px 10px -1px rgba(0,0,0,0.5);
-  --shadow-2xl: 0px 24px 48px 0px rgba(0,0,0,0.7);
+  --shadow-2xs: 0px 2px 4px 0px rgba(0,0,0,0.5);
+  --shadow-xs: 0px 2px 6px 0px rgba(0,0,0,0.5);
+  --shadow-sm: 0px 2px 6px 0px rgba(0,0,0,0.5), 0px 1px 2px -1px rgba(0,0,0,0.4);
+  --shadow: 0px 4px 10px 0px rgba(0,0,0,0.6), 0px 1px 2px -1px rgba(0,0,0,0.4);
+  --shadow-md: 0px 6px 14px 0px rgba(0,0,0,0.6), 0px 2px 4px -1px rgba(0,0,0,0.5);
+  --shadow-lg: 0px 10px 24px 0px rgba(0,0,0,0.7), 0px 4px 6px -1px rgba(0,0,0,0.5);
+  --shadow-xl: 0px 16px 40px 0px rgba(0,0,0,0.7), 0px 8px 10px -1px rgba(0,0,0,0.6);
+  --shadow-2xl: 0px 24px 56px 0px rgba(0,0,0,0.8);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 
@@ -160,6 +168,31 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+}
+
+/* Tanzania flag stripe accent at top of page */
+body::before {
+  content: "";
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(
+    to right,
+    #1B8A3C 0%,
+    #1B8A3C 33%,
+    #111111 33%,
+    #111111 38%,
+    #FDD017 38%,
+    #FDD017 62%,
+    #111111 62%,
+    #111111 67%,
+    #1565C0 67%,
+    #1565C0 100%
+  );
+  z-index: 9999;
 }
 
 @layer utilities {

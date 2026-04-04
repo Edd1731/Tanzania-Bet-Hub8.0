@@ -31,8 +31,17 @@ export default function RegisterPage() {
     <div className="min-h-[calc(100vh-56px)] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-primary-foreground font-black text-2xl">BT</span>
+          <div className="relative w-20 h-14 mx-auto mb-4 rounded-xl overflow-hidden">
+            <div className="absolute inset-0 flex">
+              <div className="flex-1" style={{ background: "#1B8A3C" }} />
+              <div className="w-3" style={{ background: "#111111" }} />
+              <div className="flex-1" style={{ background: "#FDD017" }} />
+              <div className="w-3" style={{ background: "#111111" }} />
+              <div className="flex-1" style={{ background: "#1565C0" }} />
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-white font-black text-xl drop-shadow-lg">BetTZ</span>
+            </div>
           </div>
           <h1 className="text-2xl font-black text-foreground">BetTZ</h1>
           <p className="text-muted-foreground text-sm mt-1">{t("register")}</p>
