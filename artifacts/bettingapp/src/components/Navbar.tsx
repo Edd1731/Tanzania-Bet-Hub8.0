@@ -69,9 +69,9 @@ export function Navbar({ betSlipCount = 0, onOpenBetSlip }: NavbarProps) {
             </button>
             <Link href="/" className="flex items-center gap-1.5">
               <div className="w-7 h-7 rounded-md overflow-hidden flex items-center justify-center shrink-0" style={{ background: "#1B8A3C" }}>
-                <span className="text-white font-black text-[11px] tracking-tight">BT</span>
+                <span className="text-white font-black text-[10px] tracking-tight">BP</span>
               </div>
-              <span className="font-black text-lg tracking-tight text-white">BetTZ</span>
+              <span className="font-black text-lg tracking-tight text-white">Betpesaa</span>
             </Link>
           </div>
 
@@ -277,9 +277,9 @@ function Sidebar({
 
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-md overflow-hidden flex items-center justify-center" style={{ background: "#1B8A3C" }}>
-              <span className="text-white font-black text-[11px]">BT</span>
+              <span className="text-white font-black text-[10px]">BP</span>
             </div>
-            <span className="font-black text-lg text-white tracking-tight">BetTZ</span>
+            <span className="font-black text-lg text-white tracking-tight">Betpesaa</span>
           </div>
 
           <div className="w-8" /> {/* Spacer to center logo */}

@@ -44,11 +44,11 @@ export default function RegisterPage() {
               <div className="flex-1" style={{ background: "#1565C0" }} />
             </div>
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-white font-black text-xl drop-shadow-lg">BetTZ</span>
+              <span className="text-white font-black text-xl drop-shadow-lg">Betpesaa</span>
             </div>
           </div>
           <h1 className="text-2xl font-black text-white">Create Account</h1>
-          <p className="text-white/40 text-sm mt-1">Join BetTZ today — it's free!</p>
+          <p className="text-white/40 text-sm mt-1">Join Betpesaa today — it's free!</p>
         </div>
 
         {/* Form */}
