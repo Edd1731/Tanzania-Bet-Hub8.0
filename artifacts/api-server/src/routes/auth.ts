@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { SignupBody, LoginBody } from "@workspace/api-zod";
-import { signToken } from "../middlewares/auth";
+import { signToken, requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -65,6 +65,22 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 
   const token = signToken({ id: user.id, isAdmin: user.isAdmin });
   res.json({ token, user: serializeUser(user) });
+});
+
+router.post("/auth/change-password", requireAuth, async (req, res): Promise<void> => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword || typeof newPassword !== "string" || newPassword.length < 6) {
+    res.status(400).json({ message: "New password must be at least 6 characters" });
+    return;
+  }
+  const userId = (req as any).user?.id;
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+  if (!user) { res.status(404).json({ message: "User not found" }); return; }
+  const ok = await bcrypt.compare(currentPassword, user.password);
+  if (!ok) { res.status(401).json({ message: "Current password is incorrect" }); return; }
+  const hash = await bcrypt.hash(newPassword, 10);
+  await db.update(usersTable).set({ password: hash }).where(eq(usersTable.id, userId));
+  res.json({ message: "Password changed successfully" });
 });
 
 export default router;
