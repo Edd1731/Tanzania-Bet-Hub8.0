@@ -470,6 +470,22 @@ components:
           type: number
         oddsAway:
           type: number
+        oddsO15:
+          type: number
+        oddsU15:
+          type: number
+        oddsO25:
+          type: number
+        oddsU25:
+          type: number
+        oddsO35:
+          type: number
+        oddsU35:
+          type: number
+        oddsBttsY:
+          type: number
+        oddsBttsN:
+          type: number
         status:
           type: string
           enum: [active, closed, settled]
@@ -523,7 +539,7 @@ components:
           type: integer
         choice:
           type: string
-          enum: [home, draw, away]
+          enum: [home, draw, away, dc_1x, dc_x2, dc_12, ou_o15, ou_u15, ou_o25, ou_u25, ou_o35, ou_u35, btts_yes, btts_no]
         amount:
           type: number
       required:
@@ -542,7 +558,7 @@ components:
           type: integer
         choice:
           type: string
-          enum: [home, draw, away]
+          enum: [home, draw, away, dc_1x, dc_x2, dc_12, ou_o15, ou_u15, ou_o25, ou_u25, ou_o35, ou_u35, btts_yes, btts_no]
         amount:
           type: number
         potentialWin:

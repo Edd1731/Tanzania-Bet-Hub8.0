@@ -55,6 +55,14 @@ export interface Event {
   oddsHome: number;
   oddsDraw: number;
   oddsAway: number;
+  oddsO15?: number;
+  oddsU15?: number;
+  oddsO25?: number;
+  oddsU25?: number;
+  oddsO35?: number;
+  oddsU35?: number;
+  oddsBttsY?: number;
+  oddsBttsN?: number;
   status: EventStatus;
   startsAt?: string;
   createdAt?: string;
@@ -77,6 +85,17 @@ export const PlaceBetBodyChoice = {
   home: "home",
   draw: "draw",
   away: "away",
+  dc_1x: "dc_1x",
+  dc_x2: "dc_x2",
+  dc_12: "dc_12",
+  ou_o15: "ou_o15",
+  ou_u15: "ou_u15",
+  ou_o25: "ou_o25",
+  ou_u25: "ou_u25",
+  ou_o35: "ou_o35",
+  ou_u35: "ou_u35",
+  btts_yes: "btts_yes",
+  btts_no: "btts_no",
 } as const;
 
 export interface PlaceBetBody {
@@ -91,6 +110,17 @@ export const BetChoice = {
   home: "home",
   draw: "draw",
   away: "away",
+  dc_1x: "dc_1x",
+  dc_x2: "dc_x2",
+  dc_12: "dc_12",
+  ou_o15: "ou_o15",
+  ou_u15: "ou_u15",
+  ou_o25: "ou_o25",
+  ou_u25: "ou_u25",
+  ou_o35: "ou_o35",
+  ou_u35: "ou_u35",
+  btts_yes: "btts_yes",
+  btts_no: "btts_no",
 } as const;
 
 export type BetStatus = (typeof BetStatus)[keyof typeof BetStatus];

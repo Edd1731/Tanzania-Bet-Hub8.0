@@ -16,6 +16,14 @@ export interface Event {
   oddsHome: number;
   oddsDraw: number;
   oddsAway: number;
+  oddsO15?: number;
+  oddsU15?: number;
+  oddsO25?: number;
+  oddsU25?: number;
+  oddsO35?: number;
+  oddsU35?: number;
+  oddsBttsY?: number;
+  oddsBttsN?: number;
   status: EventStatus;
   startsAt?: Date;
   createdAt?: Date;
