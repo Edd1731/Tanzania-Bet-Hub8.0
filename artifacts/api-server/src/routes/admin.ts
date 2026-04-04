@@ -4,7 +4,7 @@ import { eq, count, sum } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/auth";
 import { AdminSettleBetBody, AdminCreateEventBody } from "@workspace/api-zod";
 import { isMpesaConfigured } from "../services/mpesa-tz";
-import { isFootballApiConfigured } from "../services/football-api";
+import { isFootballApiConfigured, probeApiEndpoints } from "../services/football-api";
 import { syncLiveFixtures, syncUpcomingFixtures } from "../services/fixture-sync";
 
 const router: IRouter = Router();
@@ -227,6 +227,16 @@ router.post("/admin/withdrawals/:id/reject", requireAuth, requireAdmin, async (r
   }
 
   res.json({ id: w.id, userId: w.userId, amount: parseFloat(w.amount), phone: w.phone, method: w.method, status: "rejected", note: w.note ?? null, createdAt: w.createdAt });
+});
+
+// ─── GET /admin/probe-football — discover working API endpoints ───────────────
+router.get("/admin/probe-football", requireAuth, requireAdmin, async (req, res): Promise<void> => {
+  if (!isFootballApiConfigured()) {
+    res.status(503).json({ message: "RAPIDAPI_KEY not configured." });
+    return;
+  }
+  const results = await probeApiEndpoints();
+  res.json({ results });
 });
 
 // ─── POST /admin/sync-fixtures ────────────────────────────────────────────────
