@@ -64,7 +64,7 @@ export default function HomePage() {
       for (const bet of betSlip) {
         const amt = parseFloat(bet.amount);
         if (isNaN(amt) || amt <= 0) throw new Error("Invalid amount");
-        await placeBet.mutateAsync({ eventId: bet.eventId, choice: bet.choice, amount: amt });
+        await placeBet.mutateAsync({ data: { eventId: bet.eventId, choice: bet.choice, amount: amt } });
       }
       setBetSlip([]);
       setSuccessMsg(t("my_bets") + " - " + t("pending"));

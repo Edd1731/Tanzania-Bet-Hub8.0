@@ -21,7 +21,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     try {
-      const res = await login.mutateAsync({ phone, password });
+      const res = await login.mutateAsync({ data: { phone, password } });
       setToken(res.token);
       navigate(res.user?.isAdmin ? "/admin" : "/");
     } catch (err: any) {

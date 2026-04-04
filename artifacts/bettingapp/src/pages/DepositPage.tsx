@@ -49,7 +49,7 @@ export default function DepositPage() {
     const amt = parseFloat(amount);
     if (isNaN(amt) || amt <= 0) { setError("Invalid amount"); return; }
     try {
-      await createDeposit.mutateAsync({ amount: amt, txId, method });
+      await createDeposit.mutateAsync({ data: { amount: amt, txId, method } });
       setSuccess(true);
       setAmount(""); setTxId("");
       qc.invalidateQueries({ queryKey: getGetMyDepositsQueryKey() });

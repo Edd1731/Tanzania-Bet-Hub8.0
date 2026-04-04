@@ -19,7 +19,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
     try {
-      const res = await signup.mutateAsync({ name, phone, password });
+      const res = await signup.mutateAsync({ data: { name, phone, password } });
       setToken(res.token);
       navigate("/");
     } catch (err: any) {

@@ -62,14 +62,14 @@ export default function AdminPage() {
     e.preventDefault();
     setEventError(""); setEventSuccess("");
     try {
-      await createEvent.mutateAsync({
+      await createEvent.mutateAsync({ data: {
         teamHome: eventForm.teamHome, teamAway: eventForm.teamAway,
         league: eventForm.league,
         oddsHome: parseFloat(eventForm.oddsHome),
         oddsDraw: parseFloat(eventForm.oddsDraw),
         oddsAway: parseFloat(eventForm.oddsAway),
         startsAt: eventForm.startsAt || undefined,
-      });
+      } });
       setEventSuccess("Event created!");
       setEventForm({ teamHome: "", teamAway: "", league: "NBC Premier League", oddsHome: "2.0", oddsDraw: "3.0", oddsAway: "2.5", startsAt: "" });
     } catch (err: any) {

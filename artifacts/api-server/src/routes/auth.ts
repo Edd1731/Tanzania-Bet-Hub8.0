@@ -21,7 +21,8 @@ function serializeUser(user: typeof usersTable.$inferSelect) {
 router.post("/auth/signup", async (req, res): Promise<void> => {
   const parsed = SignupBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ message: parsed.error.message });
+    const firstIssue = parsed.error.issues[0];
+    res.status(400).json({ message: firstIssue ? `${firstIssue.path.join(".")}: ${firstIssue.message}` : "Invalid request" });
     return;
   }
 
@@ -43,7 +44,8 @@ router.post("/auth/signup", async (req, res): Promise<void> => {
 router.post("/auth/login", async (req, res): Promise<void> => {
   const parsed = LoginBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ message: parsed.error.message });
+    const firstIssue = parsed.error.issues[0];
+    res.status(400).json({ message: firstIssue ? `${firstIssue.path.join(".")}: ${firstIssue.message}` : "Invalid request" });
     return;
   }
 
