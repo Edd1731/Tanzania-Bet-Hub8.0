@@ -111,7 +111,7 @@ export default function DepositPage() {
 
     if (!parsed?.txId)    { setMsg({ ok: false, text: isSw ? "Hakuna nambari ya muamala iliyopatikana kwenye ujumbe." : "No transaction ID found in your SMS. Paste the full confirmation message." }); return; }
     if (!parsed?.amount)  { setMsg({ ok: false, text: isSw ? "Kiasi hakikupatikana kwenye ujumbe." : "Amount not detected. Make sure you paste the full payment SMS." }); return; }
-    if (parsed.amount < 500) { setMsg({ ok: false, text: isSw ? "Kiasi cha chini ni TZS 500." : "Minimum deposit is TZS 500." }); return; }
+    if (parsed.amount < 50_000) { setMsg({ ok: false, text: isSw ? "Kiwango cha chini cha amana ni TZS 50,000." : "Minimum deposit is TZS 50,000." }); return; }
     if (!phone.trim() || phone.trim().replace(/\s/g, "").length < 9) {
       setMsg({ ok: false, text: isSw ? "Weka nambari yako ya simu." : "Enter your mobile phone number." });
       return;
@@ -151,15 +151,17 @@ export default function DepositPage() {
     { num: "1", text: "Fungua M-Pesa, TigoPesa, HaloPesa au Airtel Money yako" },
     { num: "2", text: 'Chagua "Lipa" au "Tuma Pesa"' },
     { num: "3", text: <>Lipa kwa namba hii ya Lipa: <span style={{ color: GOLD }} className="font-black">{LIPA_NUMBER}</span></> },
-    { num: "4", text: "Weka kiasi unachotaka kuweka" },
+    { num: "4", text: "Weka kiasi (kiwango cha chini TZS 50,000)" },
     { num: "5", text: "Thibitisha kwa PIN yako" },
   ] : [
     { num: "1", text: "Open M-Pesa, TigoPesa, HaloPesa or Airtel Money" },
     { num: "2", text: 'Select "Lipa" / "Send Money"' },
     { num: "3", text: <>Pay to Lipa number: <span style={{ color: GOLD }} className="font-black">{LIPA_NUMBER}</span></> },
-    { num: "4", text: "Enter the amount you want to deposit" },
+    { num: "4", text: "Enter the amount (minimum TZS 50,000)" },
     { num: "5", text: "Confirm with your PIN" },
   ];
+
+  const QUICK_AMOUNTS = [50_000, 100_000, 150_000, 200_000, 300_000, 500_000];
 
   return (
     <div className="max-w-lg mx-auto px-0 pt-0 pb-8" style={{ background: "#0a1628", minHeight: "100vh" }}>
@@ -225,6 +227,63 @@ export default function DepositPage() {
         </div>
       </div>
 
+      {/* ── Quick amount selector ── */}
+      <div className="mx-3 mb-4 rounded-2xl overflow-hidden" style={{ background: "#111827", border: "1px solid rgba(255,255,255,0.08)" }}>
+        <div className="px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-base">💰</span>
+              <span className="text-sm font-black text-white">
+                {isSw ? "Chagua Kiasi" : "Select Amount"}
+              </span>
+            </div>
+            <span
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+              style={{ background: "rgba(253,208,23,0.12)", color: GOLD }}
+            >
+              {isSw ? "Kiwango cha chini: TZS 50,000" : "Min: TZS 50,000"}
+            </span>
+          </div>
+        </div>
+        <div className="px-4 py-3 grid grid-cols-3 gap-2">
+          {QUICK_AMOUNTS.map(amt => (
+            <button
+              key={amt}
+              type="button"
+              className="py-2.5 rounded-xl text-xs font-black transition-all active:scale-95"
+              style={{
+                background: "rgba(253,208,23,0.1)",
+                color: GOLD,
+                border: "1px solid rgba(253,208,23,0.2)",
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(253,208,23,0.2)";
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(253,208,23,0.1)";
+              }}
+            >
+              {amt >= 1_000_000
+                ? `${(amt / 1_000_000).toFixed(amt % 1_000_000 === 0 ? 0 : 1)}M`
+                : `${(amt / 1_000).toFixed(0)}K`}
+            </button>
+          ))}
+        </div>
+        <div
+          className="mx-4 mb-3 rounded-xl px-3 py-2.5 flex items-center gap-2"
+          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round">
+            <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+          </svg>
+          <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>
+            {isSw
+              ? "Kiasi chochote kinachozidi TZS 50,000 kinakubaliwa."
+              : "Any amount from TZS 50,000 to TZS 500,000+ is accepted."}
+          </p>
+        </div>
+      </div>
+
       {/* ── Paste SMS card ── */}
       <form onSubmit={handleSubmit} className="mx-3 space-y-4">
         <div className="rounded-2xl overflow-hidden" style={{ background: "#111827", border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -251,8 +310,8 @@ export default function DepositPage() {
               rows={3}
               placeholder={
                 isSw
-                  ? "Mfano: Confirmed. TSH 5,000 sent to 148470928...\nTransaction ID: MP12345678"
-                  : "Example: Confirmed. TSH 5,000 sent to 148470928...\nTransaction ID: MP12345678"
+                  ? "Mfano: Confirmed. TSH 50,000 sent to 148470928...\nTransaction ID: MP12345678"
+                  : "Example: Confirmed. TSH 50,000 sent to 148470928...\nTransaction ID: MP12345678"
               }
               className="w-full px-3 py-3 rounded-xl text-sm text-white placeholder-white/20 outline-none resize-none leading-relaxed"
               style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
