@@ -77,7 +77,7 @@ async function upsertFixture(f: ApiFixture): Promise<void> {
                               .limit(1);
 
   if (existing.length > 0) {
-    // Update live fields only — preserve manually-set odds from admin
+    // Update all synced fields — preserve manually-set odds from admin
     await db.update(eventsTable).set({
       scoreHome:   f.scoreHome,
       scoreAway:   f.scoreAway,
@@ -88,6 +88,10 @@ async function upsertFixture(f: ApiFixture): Promise<void> {
       teamAway:    f.teamAway,
       logoHome:    f.logoHome,
       logoAway:    f.logoAway,
+      league:      f.league,
+      country:     f.country,
+      leagueLogo:  f.leagueLogo,
+      startsAt:    f.startsAt,
     }).where(eq(eventsTable.matchId, f.matchId));
   } else {
     // New fixture — generate odds

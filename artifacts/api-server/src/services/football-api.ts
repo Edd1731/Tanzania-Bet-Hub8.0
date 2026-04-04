@@ -2,18 +2,18 @@
  * Free API Live Football Data — via RapidAPI
  * Host: free-api-live-football-data.p.rapidapi.com
  *
- * How to get your key:
- *   1. Open RapidAPI → you are already on the "Free API Live Football Data" page
- *   2. The X-RapidAPI-Key value shown there IS your key
- *   3. Click on that field to select the full key, copy it
- *   4. Paste it into Replit Secrets as RAPIDAPI_KEY
+ * Required secret: RAPIDAPI_KEY  (your RapidAPI account key)
  *
- * Required secret (set in Replit Secrets):
- *   RAPIDAPI_KEY  — your RapidAPI account key (same key for all APIs on RapidAPI)
+ * Key findings from API probing:
+ *   - Date format:  YYYYMMDD  (e.g. 20260404)
+ *   - Matches:      GET /football-get-matches-by-date?date=YYYYMMDD
+ *   - Leagues:      GET /football-get-all-leagues
+ *   - No separate live endpoint — filter matches by status.ongoing === true
+ *   - Logo CDN:     images.fotmob.com  (Fotmob-backed API)
  */
 
-const BASE_URL = "https://free-api-live-football-data.p.rapidapi.com";
-const RAPIDAPI_HOST = "free-api-live-football-data.p.rapidapi.com";
+const BASE_URL   = "https://free-api-live-football-data.p.rapidapi.com";
+const RAPID_HOST = "free-api-live-football-data.p.rapidapi.com";
 
 export interface ApiFixture {
   fixtureId:   number;
@@ -32,7 +32,7 @@ export interface ApiFixture {
   scoreAway:   number | null;
 }
 
-// ─── Auth check ───────────────────────────────────────────────────────────────
+// ─── Config check ─────────────────────────────────────────────────────────────
 
 export function isFootballApiConfigured(): boolean {
   return !!process.env.RAPIDAPI_KEY;
@@ -41,210 +41,307 @@ export function isFootballApiConfigured(): boolean {
 function headers(): Record<string, string> {
   return {
     "x-rapidapi-key":  process.env.RAPIDAPI_KEY!,
-    "x-rapidapi-host": RAPIDAPI_HOST,
+    "x-rapidapi-host": RAPID_HOST,
   };
 }
 
-// ─── Generic fetch helper with logging ───────────────────────────────────────
+// ─── Fotmob CDN logo helpers ──────────────────────────────────────────────────
 
-async function apiFetch(path: string): Promise<any> {
-  const url = `${BASE_URL}${path}`;
-  const res = await fetch(url, {
-    method: "GET",
-    headers: headers(),
-    signal: AbortSignal.timeout(10_000),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`API ${res.status}: ${body.slice(0, 200)}`);
-  }
-
-  const data = await res.json();
-  return data;
+function teamLogo(teamId: number): string {
+  return `https://images.fotmob.com/image_resources/logo/teamlogo/${teamId}_small.png`;
 }
 
-// ─── Response parsers ─────────────────────────────────────────────────────────
-// The "Free API Live Football Data" API wraps results in { response: [...] }
-// similar to API-Football v3.
+function leagueLogo(leagueId: number): string {
+  return `https://images.fotmob.com/image_resources/logo/leaguelogo/${leagueId}.png`;
+}
 
-function statusShortFromLong(longStatus: string, elapsed?: number): string {
-  const s = (longStatus ?? "").toLowerCase();
-  if (s.includes("not started") || s === "ns")      return "NS";
-  if (s.includes("first half")  || s === "1h")      return "1H";
-  if (s.includes("halftime")    || s === "ht")      return "HT";
-  if (s.includes("second half") || s === "2h")      return "2H";
-  if (s.includes("extra time")  || s === "et")      return "ET";
-  if (s.includes("penalty")     || s === "p")       return "PEN";
-  if (s.includes("finished")    || s === "ft")      return "FT";
-  if (s.includes("full time")   || s === "ft")      return "FT";
-  if (s.includes("postponed")   || s === "pst")     return "PST";
-  if (s.includes("cancelled")   || s === "canc")    return "CANC";
-  if (s.includes("abandoned")   || s === "abt")     return "ABD";
-  if (s.includes("suspended")   || s === "susp")    return "SUSP";
-  if (s.includes("live") && (elapsed ?? 0) > 45)    return "2H";
-  if (s.includes("live"))                           return "1H";
+// ─── Date formatting ──────────────────────────────────────────────────────────
+
+function toApiDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}${m}${day}`;
+}
+
+// ─── Status mapping ───────────────────────────────────────────────────────────
+// API gives: status.started, status.ongoing, status.finished, status.cancelled
+// plus halfs.firstHalfStarted / halfs.secondHalfStarted
+
+interface ApiStatus {
+  started:   boolean;
+  ongoing:   boolean;
+  finished:  boolean;
+  cancelled: boolean;
+  liveTime?: { short?: string; long?: string };
+  halfs?: { firstHalfStarted?: string; secondHalfStarted?: string };
+}
+
+function deriveStatusShort(s: ApiStatus): string {
+  if (s.cancelled)                                    return "CANC";
+  if (s.finished)                                     return "FT";
+  if (s.started && s.ongoing && s.halfs?.secondHalfStarted) return "2H";
+  if (s.started && !s.ongoing && !s.finished)         return "HT";
+  if (s.started && s.ongoing)                         return "1H";
   return "NS";
 }
 
-function parseFixture(f: any): ApiFixture | null {
-  try {
-    // Support both API-Football v3 format and Free API Live Football format
-    // API-Football v3: f.fixture, f.teams, f.goals, f.league
-    // Free API: may vary — handle both
-    const fixtureId: number =
-      f.fixture?.id ?? f.id ?? f.match_id ?? f.fixtureId ?? 0;
+function deriveElapsed(s: ApiStatus): number | null {
+  // liveTime.long is "49:05" (minutes:seconds)
+  const long = s.liveTime?.long;
+  if (!long) return null;
+  const parts = long.split(":");
+  const mins = parseInt(parts[0], 10);
+  return isNaN(mins) ? null : mins;
+}
 
+// ─── Parse one match object ───────────────────────────────────────────────────
+
+function parseMatch(m: any, leagueMap: Map<number, {name: string; ccode: string}>): ApiFixture | null {
+  try {
+    const fixtureId: number = m.id;
     if (!fixtureId) return null;
 
-    const teamHome: string =
-      f.teams?.home?.name ?? f.homeTeam?.name ?? f.home_team ?? f.home ?? "";
-    const teamAway: string =
-      f.teams?.away?.name ?? f.awayTeam?.name ?? f.away_team ?? f.away ?? "";
+    const leagueId: number = m.leagueId ?? 0;
+    const leagueInfo = leagueMap.get(leagueId);
 
+    const teamHome = m.home?.longName ?? m.home?.name ?? "";
+    const teamAway = m.away?.longName ?? m.away?.name ?? "";
     if (!teamHome || !teamAway) return null;
 
-    const league: string =
-      f.league?.name ?? f.competition?.name ?? f.tournament ?? "Unknown League";
-    const country: string =
-      f.league?.country ?? f.country?.name ?? f.area?.name ?? "";
-    const logoHome: string =
-      f.teams?.home?.logo ?? f.homeTeam?.logo ?? f.home_team_logo ?? "";
-    const logoAway: string =
-      f.teams?.away?.logo ?? f.awayTeam?.logo ?? f.away_team_logo ?? "";
-    const leagueLogo: string =
-      f.league?.logo ?? f.competition?.emblem ?? "";
+    const league  = leagueInfo?.name ?? "Unknown League";
+    const country = leagueInfo?.ccode ?? "";
 
-    const dateStr: string =
-      f.fixture?.date ?? f.date ?? f.match_date ?? f.kickoff ?? "";
-    const startsAt: Date = dateStr ? new Date(dateStr) : new Date();
+    const logoHome = m.home?.id ? teamLogo(m.home.id) : "";
+    const logoAway = m.away?.id ? teamLogo(m.away.id) : "";
+    const lgLogo   = leagueId   ? leagueLogo(leagueId) : "";
 
-    const statusLong: string =
-      f.fixture?.status?.long ?? f.status?.long ?? f.matchStatus ?? f.status ?? "";
-    const statusShortRaw: string =
-      f.fixture?.status?.short ?? f.status?.short ?? "";
-    const elapsed: number | null =
-      f.fixture?.status?.elapsed ?? f.elapsed ?? f.minute ?? null;
+    // Parse kickoff time — API gives "DD.MM.YYYY HH:MM" (local), also has utcTime
+    const utcTime: string = m.status?.utcTime ?? "";
+    const startsAt = utcTime ? new Date(utcTime) : new Date(m.timeTS ?? Date.now());
 
-    const statusShort = statusShortRaw || statusShortFromLong(statusLong, elapsed ?? undefined);
+    const status: ApiStatus = {
+      started:   m.status?.started   ?? false,
+      ongoing:   m.status?.ongoing   ?? false,
+      finished:  m.status?.finished  ?? false,
+      cancelled: m.status?.cancelled ?? false,
+      liveTime:  m.status?.liveTime,
+      halfs:     m.status?.halfs,
+    };
 
-    const scoreHome: number | null =
-      f.goals?.home ?? f.score?.home ?? f.home_score ?? f.homeGoals ?? null;
-    const scoreAway: number | null =
-      f.goals?.away ?? f.score?.away ?? f.away_score ?? f.awayGoals ?? null;
+    const statusShort = deriveStatusShort(status);
+    const elapsed     = deriveElapsed(status);
+
+    const scoreHome: number | null = m.home?.score ?? null;
+    const scoreAway: number | null = m.away?.score ?? null;
 
     return {
       fixtureId,
-      matchId:    `api-${fixtureId}`,
+      matchId: `foto-${fixtureId}`,
       teamHome,
       teamAway,
       league,
       country,
       logoHome,
       logoAway,
-      leagueLogo,
+      leagueLogo: lgLogo,
       startsAt,
       statusShort,
-      elapsed:   elapsed ?? null,
+      elapsed,
       scoreHome,
       scoreAway,
     };
   } catch (e) {
-    console.warn("[football-api] parseFixture error:", e);
+    console.warn("[football-api] parseMatch error:", e);
     return null;
   }
 }
 
-function parseResponse(data: any): ApiFixture[] {
-  // Handle both { response: [...] } and { data: [...] } and plain arrays
-  const items: any[] = Array.isArray(data)
-    ? data
-    : (data?.response ?? data?.data ?? data?.fixtures ?? data?.matches ?? []);
+// ─── Fetch helpers ────────────────────────────────────────────────────────────
 
-  return items
-    .map(parseFixture)
-    .filter((f): f is ApiFixture => f !== null);
+async function apiFetch(path: string): Promise<any> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: "GET",
+    headers: headers(),
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`);
+  }
+  return res.json();
 }
 
-// ─── API calls ────────────────────────────────────────────────────────────────
+// ─── Static fallback map (Fotmob league IDs — confirmed from API probing) ─────
+const STATIC_LEAGUES: Record<number, {name: string; ccode: string}> = {
+  // International
+  42: { name: "Champions League",      ccode: "INT" },
+  73: { name: "Europa League",         ccode: "INT" },
+  10216: { name: "Conference League",  ccode: "INT" },
+  77: { name: "World Cup",             ccode: "INT" },
+  50: { name: "EURO",                  ccode: "INT" },
+  44: { name: "Copa America",          ccode: "INT" },
+  45: { name: "Copa Libertadores",     ccode: "INT" },
+  299: { name: "Copa Sudamericana",    ccode: "INT" },
+  289: { name: "Africa Cup of Nations",ccode: "INT" },
+  526: { name: "CAF Champions League", ccode: "INT" },
+  // England
+  47: { name: "Premier League",        ccode: "ENG" },
+  48: { name: "Championship",          ccode: "ENG" },
+  49: { name: "League One",            ccode: "ENG" },
+  51: { name: "League Two",            ccode: "ENG" },
+  // Germany
+  54: { name: "Bundesliga",            ccode: "GER" },
+  84: { name: "2. Bundesliga",         ccode: "GER" },
+  208: { name: "3. Liga",              ccode: "GER" },
+  // Spain
+  87: { name: "La Liga",               ccode: "ESP" },
+  88: { name: "La Liga 2",             ccode: "ESP" },
+  // Italy
+  55: { name: "Serie A",               ccode: "ITA" },
+  56: { name: "Serie B",               ccode: "ITA" },
+  // France
+  53: { name: "Ligue 1",               ccode: "FRA" },
+  60: { name: "Ligue 2",               ccode: "FRA" },
+  // Portugal
+  61: { name: "Primeira Liga",         ccode: "POR" },
+  185: { name: "Liga Portugal 2",      ccode: "POR" },
+  // Netherlands
+  57: { name: "Eredivisie",            ccode: "NED" },
+  // Russia
+  63: { name: "Russian Premier League",ccode: "RUS" },
+  // Turkey
+  71: { name: "Süper Lig",             ccode: "TUR" },
+  165: { name: "TFF 1. Lig",           ccode: "TUR" },
+  // Poland
+  83: { name: "Ekstraklasa",           ccode: "POL" },
+  // Scotland
+  115: { name: "Scottish Premiership", ccode: "SCO" },
+  // Belgium
+  68: { name: "First Division A",      ccode: "BEL" },
+  264: { name: "First Division B",     ccode: "BEL" },
+  // Saudi Arabia
+  307: { name: "Saudi Pro League",     ccode: "SAU" },
+  // Tanzania
+  384: { name: "NBC Premier League",   ccode: "TZA" },
+  // Israel
+  127: { name: "Israeli Premier League", ccode: "ISR" },
+  // Others confirmed from API probing
+  67:  { name: "Allsvenskan",           ccode: "SWE" },
+  229: { name: "BGL Ligue",             ccode: "LUX" },
+  232: { name: "First League",          ccode: "MNE" },
+  173: { name: "PrvaLiga",              ccode: "SVN" },
+  182: { name: "Superliga",             ccode: "SRB" },
+  538: { name: "Super Lig",             ccode: "TUR" },
+  9066: { name: "FKF Premier League",   ccode: "KEN" },
+  9096: { name: "First League",         ccode: "BUL" },
+  9473: { name: "National First Division", ccode: "RSA" },
+  9498: { name: "Veikkausliiga",         ccode: "FIN" },
+  // Domestic league pages (Fotmob internal IDs discovered from live data)
+  899890: { name: "Ekstraklasa",         ccode: "POL" },
+  899985: { name: "Ekstraklasa",         ccode: "POL" },
+  900416: { name: "Fortuna Liga",        ccode: "CZE" },
+  900474: { name: "Fortuna Liga",        ccode: "SVK" },
+  900476: { name: "HNL",                 ccode: "CRO" },
+  900477: { name: "SuperLiga",           ccode: "DEN" },
+  900478: { name: "Eliteserien",         ccode: "NOR" },
+  901093: { name: "Romanian Liga I",     ccode: "ROU" },
+  901354: { name: "Swiss Super League",  ccode: "SUI" },
+  901355: { name: "Prva liga",           ccode: "SRB" },
+  901481: { name: "A-League",            ccode: "AUS" },
+  901537: { name: "Premiership",         ccode: "SCO" },
+  901568: { name: "3F Superliga",        ccode: "DEN" },
+  901979: { name: "Nemzeti Bajnokság",   ccode: "HUN" },
+  916561: { name: "Premiership",         ccode: "NIR" },
+  918603: { name: "League of Ireland",   ccode: "IRL" },
+  918604: { name: "Welsh Premier League", ccode: "WAL" },
+  919925: { name: "Girabola",            ccode: "ANG" },
+  920267: { name: "Premier League",      ccode: "GHA" },
+  1000001263: { name: "Bundesliga",      ccode: "AUT" },
+  1000001264: { name: "2. Liga",         ccode: "AUT" },
+};
 
-/**
- * Fetch all currently live fixtures.
- * Tries several common endpoint paths for this API.
- */
-export async function fetchLiveFixtures(): Promise<ApiFixture[]> {
-  const paths = [
-    "/football-get-all-livescore",
-    "/football-live-scores",
-    "/football-livescores",
-    "/livescores",
-  ];
+// Cache the league map — refresh once per hour
+let leagueCacheTime = 0;
+let leagueCache: Map<number, {name: string; ccode: string}> = new Map();
 
-  for (const path of paths) {
-    try {
-      const data = await apiFetch(path);
-      const fixtures = parseResponse(data);
-      if (fixtures.length > 0 || data?.response !== undefined || Array.isArray(data)) {
-        console.log(`[football-api] live: ${path} → ${fixtures.length} fixtures`);
-        return fixtures;
-      }
-    } catch (e: any) {
-      console.log(`[football-api] live path ${path} failed: ${e.message}`);
-    }
+async function getLeagueMap(): Promise<Map<number, {name: string; ccode: string}>> {
+  const now = Date.now();
+  if (now - leagueCacheTime < 60 * 60_000 && leagueCache.size > 0) {
+    return leagueCache;
   }
 
-  console.warn("[football-api] live: all paths failed");
-  return [];
+  // Start with static fallbacks
+  const map = new Map<number, {name: string; ccode: string}>(
+    Object.entries(STATIC_LEAGUES).map(([k, v]) => [Number(k), v])
+  );
+
+  try {
+    const data = await apiFetch("/football-get-all-leagues");
+    const leagues: any[] = data?.response?.leagues ?? [];
+    for (const l of leagues) {
+      if (l.id) map.set(l.id, { name: l.name ?? "Unknown", ccode: l.ccode ?? "" });
+    }
+    console.log(`[football-api] league map loaded: ${map.size} leagues (${leagues.length} from API + static fallbacks)`);
+  } catch (e: any) {
+    console.warn("[football-api] getLeagueMap API fetch failed, using static map:", e.message);
+  }
+
+  leagueCache = map;
+  leagueCacheTime = now;
+  return map;
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+
+/**
+ * Fetch live fixtures (status.ongoing === true) from today's match list.
+ */
+export async function fetchLiveFixtures(): Promise<ApiFixture[]> {
+  const leagueMap = await getLeagueMap();
+  const dateStr   = toApiDate(new Date());
+
+  const data = await apiFetch(`/football-get-matches-by-date?date=${dateStr}`);
+  const matches: any[] = data?.response?.matches ?? [];
+
+  const live = matches
+    .filter(m => m.status?.ongoing === true)
+    .map(m => parseMatch(m, leagueMap))
+    .filter((f): f is ApiFixture => f !== null);
+
+  console.log(`[football-api] live: ${live.length} ongoing matches`);
+  return live;
 }
 
 /**
- * Fetch today's and the next 2 days' fixtures.
+ * Fetch today + tomorrow + day after fixtures (all statuses).
  */
 export async function fetchAllUpcomingFixtures(): Promise<ApiFixture[]> {
-  const dates: string[] = [];
+  const leagueMap = await getLeagueMap();
+  const results: ApiFixture[] = [];
+
   for (let i = 0; i < 3; i++) {
     const d = new Date();
     d.setDate(d.getDate() + i);
-    dates.push(d.toISOString().slice(0, 10));
+    const dateStr = toApiDate(d);
+
+    try {
+      const data = await apiFetch(`/football-get-matches-by-date?date=${dateStr}`);
+      const matches: any[] = data?.response?.matches ?? [];
+      const parsed = matches
+        .map(m => parseMatch(m, leagueMap))
+        .filter((f): f is ApiFixture => f !== null);
+
+      console.log(`[football-api] ${dateStr}: ${parsed.length} matches`);
+      results.push(...parsed);
+    } catch (e: any) {
+      console.warn(`[football-api] fetch ${dateStr} failed:`, e.message);
+    }
+
+    if (i < 2) await new Promise(r => setTimeout(r, 300));
   }
 
-  const results: ApiFixture[] = [];
-
-  for (const date of dates) {
-    const paths = [
-      `/football-get-fixtures-by-date?date=${date}`,
-      `/football-fixtures-by-date?date=${date}`,
-      `/fixtures?date=${date}`,
-      `/football-get-matches-by-date?date=${date}`,
-    ];
-
-    let fetched = false;
-    for (const path of paths) {
-      try {
-        const data = await apiFetch(path);
-        const fixtures = parseResponse(data);
-        if (fixtures.length > 0 || Array.isArray(data?.response)) {
-          console.log(`[football-api] upcoming ${date}: ${path} → ${fixtures.length} fixtures`);
-          results.push(...fixtures);
-          fetched = true;
-          break;
-        }
-      } catch (e: any) {
-        console.log(`[football-api] upcoming ${date} path ${path} failed: ${e.message}`);
-      }
-    }
-
-    if (!fetched) {
-      console.warn(`[football-api] upcoming ${date}: all paths failed`);
-    }
-
-    // Small delay between date requests to be gentle on rate limits
-    if (date !== dates[dates.length - 1]) {
-      await new Promise(r => setTimeout(r, 300));
-    }
-  }
-
-  // De-duplicate by fixtureId
+  // De-duplicate
   const seen = new Set<number>();
   return results.filter(f => {
     if (seen.has(f.fixtureId)) return false;
@@ -254,30 +351,27 @@ export async function fetchAllUpcomingFixtures(): Promise<ApiFixture[]> {
 }
 
 /**
- * Probe the API to find working endpoints — useful for debugging.
- * Tries a few common paths and logs results.
+ * Probe endpoint — used by admin panel to verify API is working.
  */
 export async function probeApiEndpoints(): Promise<{ path: string; status: string; count: number }[]> {
-  const testPaths = [
-    "/football-get-all-livescore",
-    "/football-live-scores",
-    `/football-get-fixtures-by-date?date=${new Date().toISOString().slice(0, 10)}`,
-    `/football-fixtures-by-date?date=${new Date().toISOString().slice(0, 10)}`,
-    "/football-get-popular-leagues",
+  const results: { path: string; status: string; count: number }[] = [];
+  const dateStr = toApiDate(new Date());
+
+  const paths = [
+    `/football-get-matches-by-date?date=${dateStr}`,
     "/football-get-all-leagues",
-    "/leagues",
   ];
 
-  const results = [];
-  for (const path of testPaths) {
+  for (const path of paths) {
     try {
       const data = await apiFetch(path);
-      const items = parseResponse(data);
-      results.push({ path, status: "ok", count: items.length });
+      const matches = data?.response?.matches ?? data?.response?.leagues ?? [];
+      results.push({ path, status: "ok", count: Array.isArray(matches) ? matches.length : 0 });
     } catch (e: any) {
-      results.push({ path, status: e.message.slice(0, 60), count: 0 });
+      results.push({ path, status: e.message.slice(0, 80), count: 0 });
     }
     await new Promise(r => setTimeout(r, 200));
   }
+
   return results;
 }
