@@ -81,12 +81,16 @@ export default function DepositPage() {
   const createDeposit = useCreateDeposit();
   const { data: deposits, isLoading } = useGetMyDeposits({ query: { queryKey: getGetMyDepositsQueryKey() } });
 
-  const [sms, setSms]         = useState("");
-  const [phone, setPhone]     = useState("");
-  const [parsed, setParsed]   = useState<{ amount: number | null; txId: string | null; method: string } | null>(null);
+  const [sms, setSms]           = useState("");
+  const [phone, setPhone]       = useState("");
+  const [parsed, setParsed]     = useState<{ amount: number | null; txId: string | null; method: string } | null>(null);
   const [copyDone, setCopyDone] = useState(false);
-  const [msg, setMsg]         = useState<{ ok: boolean; text: string; auto?: boolean } | null>(null);
+  const [msg, setMsg]           = useState<{ ok: boolean; text: string; auto?: boolean } | null>(null);
+  const [desiredAmount, setDesiredAmount] = useState<string>("");
   const isSw = lang === "sw";
+
+  const desiredNum = parseInt(desiredAmount.replace(/,/g, ""), 10);
+  const desiredValid = !isNaN(desiredNum) && desiredNum >= 50_000;
 
   const handleSmsChange = (val: string) => {
     setSms(val);
@@ -245,43 +249,111 @@ export default function DepositPage() {
             </span>
           </div>
         </div>
-        <div className="px-4 py-3 grid grid-cols-3 gap-2">
-          {QUICK_AMOUNTS.map(amt => (
-            <button
-              key={amt}
-              type="button"
-              className="py-2.5 rounded-xl text-xs font-black transition-all active:scale-95"
-              style={{
-                background: "rgba(253,208,23,0.1)",
-                color: GOLD,
-                border: "1px solid rgba(253,208,23,0.2)",
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLButtonElement).style.background = "rgba(253,208,23,0.2)";
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLButtonElement).style.background = "rgba(253,208,23,0.1)";
-              }}
+        {/* Quick-pick grid */}
+        <div className="px-4 pt-3 pb-2 grid grid-cols-3 gap-2">
+          {QUICK_AMOUNTS.map(amt => {
+            const isSelected = desiredNum === amt;
+            return (
+              <button
+                key={amt}
+                type="button"
+                onClick={() => setDesiredAmount(String(amt))}
+                className="py-2.5 rounded-xl text-xs font-black transition-all active:scale-95"
+                style={{
+                  background: isSelected ? GOLD : "rgba(253,208,23,0.1)",
+                  color: isSelected ? "#000" : GOLD,
+                  border: `1px solid ${isSelected ? GOLD : "rgba(253,208,23,0.2)"}`,
+                  boxShadow: isSelected ? `0 0 12px rgba(253,208,23,0.3)` : "none",
+                }}
+              >
+                {amt >= 1_000_000
+                  ? `${(amt / 1_000_000).toFixed(amt % 1_000_000 === 0 ? 0 : 1)}M`
+                  : `${(amt / 1_000).toFixed(0)}K`}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Manual amount input */}
+        <div className="px-4 pb-3">
+          <div className="text-[10px] font-bold mb-1.5 uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.35)" }}>
+            {isSw ? "Au weka kiasi kingine:" : "Or enter a custom amount:"}
+          </div>
+          <div className="relative">
+            <span
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black"
+              style={{ color: "rgba(255,255,255,0.4)" }}
             >
-              {amt >= 1_000_000
-                ? `${(amt / 1_000_000).toFixed(amt % 1_000_000 === 0 ? 0 : 1)}M`
-                : `${(amt / 1_000).toFixed(0)}K`}
-            </button>
-          ))}
+              TZS
+            </span>
+            <input
+              type="number"
+              min={50000}
+              step={1000}
+              value={desiredAmount}
+              onChange={e => setDesiredAmount(e.target.value)}
+              placeholder="e.g. 750000"
+              className="w-full pl-12 pr-4 py-3 rounded-xl text-sm font-bold text-white outline-none"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                border: `1px solid ${desiredAmount && !desiredValid ? "rgba(239,68,68,0.5)" : desiredValid ? "rgba(253,208,23,0.4)" : "rgba(255,255,255,0.1)"}`,
+                MozAppearance: "textfield",
+              }}
+            />
+            {desiredValid && (
+              <span
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black"
+                style={{ color: "#4ade80" }}
+              >
+                ✓
+              </span>
+            )}
+          </div>
+          {desiredAmount && !desiredValid && (
+            <p className="text-[10px] mt-1" style={{ color: "#f87171" }}>
+              {isSw ? "Kiwango cha chini ni TZS 50,000" : "Minimum is TZS 50,000"}
+            </p>
+          )}
         </div>
-        <div
-          className="mx-4 mb-3 rounded-xl px-3 py-2.5 flex items-center gap-2"
-          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round">
-            <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
-          </svg>
-          <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>
-            {isSw
-              ? "Kiasi chochote kinachozidi TZS 50,000 kinakubaliwa."
-              : "Any amount from TZS 50,000 to TZS 500,000+ is accepted."}
-          </p>
-        </div>
+
+        {/* Send-this-amount callout */}
+        {desiredValid && (
+          <div
+            className="mx-4 mb-3 rounded-xl px-4 py-3 flex items-center justify-between"
+            style={{ background: "rgba(253,208,23,0.08)", border: "1px solid rgba(253,208,23,0.2)" }}
+          >
+            <div>
+              <div className="text-[10px] uppercase tracking-widest mb-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>
+                {isSw ? "Tuma kiasi hiki:" : "Send this amount to Lipa:"}
+              </div>
+              <div className="text-lg font-black" style={{ color: GOLD }}>
+                TZS {desiredNum.toLocaleString()}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] uppercase tracking-widest mb-0.5" style={{ color: "rgba(255,255,255,0.4)" }}>
+                {isSw ? "Kwa namba:" : "To number:"}
+              </div>
+              <div className="text-base font-black text-white">{LIPA_NUMBER}</div>
+            </div>
+          </div>
+        )}
+
+        {!desiredValid && (
+          <div
+            className="mx-4 mb-3 rounded-xl px-3 py-2.5 flex items-center gap-2"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="2" strokeLinecap="round">
+              <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+            </svg>
+            <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>
+              {isSw
+                ? "Chagua au weka kiasi, kisha lipa kupitia simu yako."
+                : "Pick or type an amount, then pay via your phone."}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ── Paste SMS card ── */}
