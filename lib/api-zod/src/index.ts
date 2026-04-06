@@ -1,1 +1,1 @@
-export * from "./generated/api"; //export * from './Generated/types';//DO NOT include this line
+export * from "./generated/api";
